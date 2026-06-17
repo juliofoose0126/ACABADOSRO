@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #1a365d;
+  --primary-light: #2a4a7f;
+  --primary-dark: #0f2440;
+  --accent: #e53e3e;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
