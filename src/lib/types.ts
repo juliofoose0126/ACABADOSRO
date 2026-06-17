@@ -110,7 +110,7 @@ export const MESES = [
 
 export const CATEGORIAS_GASTO: Record<TipoGasto, string> = {
   nomina: 'Nóminas',
-  seguros: 'Seguros',
+  seguros: 'Legales',
   materiales: 'Materiales',
   otros: 'Otros Gastos',
 };

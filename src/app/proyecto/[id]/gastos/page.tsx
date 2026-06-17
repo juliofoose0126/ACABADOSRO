@@ -309,7 +309,7 @@ export default function GastosPage() {
       const sheets = [
         { name: 'Resumen', data: resumenData, headers: resumenHeaders },
         { name: 'Nominas', data: makeDetailData('nomina'), headers: detailHeaders },
-        { name: 'Seguros', data: makeDetailData('seguros'), headers: detailHeaders },
+        { name: 'Legales', data: makeDetailData('seguros'), headers: detailHeaders },
         { name: 'Materiales', data: makeDetailData('materiales'), headers: detailHeaders },
         { name: 'Otros Gastos', data: makeDetailData('otros'), headers: detailHeaders },
       ];
@@ -330,7 +330,7 @@ export default function GastosPage() {
 
   const summaryCards = [
     { label: 'Total Nominas', value: totals.nomina, cat: 'nomina' as TipoGasto },
-    { label: 'Total Seguros', value: totals.seguros, cat: 'seguros' as TipoGasto },
+    { label: 'Total Legales', value: totals.seguros, cat: 'seguros' as TipoGasto },
     { label: 'Total Materiales', value: totals.materiales, cat: 'materiales' as TipoGasto },
     { label: 'Total Otros', value: totals.otros, cat: 'otros' as TipoGasto },
   ];
