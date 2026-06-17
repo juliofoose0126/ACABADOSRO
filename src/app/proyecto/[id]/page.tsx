@@ -6,10 +6,10 @@ import {
   Package,
   ShoppingCart,
   DollarSign,
+  TrendingUp,
   Truck,
   Plus,
   ArrowRight,
-  TrendingUp,
   AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +17,8 @@ import { supabase } from '@/lib/supabase';
 interface Stats {
   totalMateriales: number;
   ordenesPendientes: number;
-  gastosMes: number;
+  totalIngresos: number;
+  totalGastos: number;
   totalProveedores: number;
   lowStockCount: number;
 }
@@ -32,7 +33,8 @@ export default function ProjectDashboardPage() {
   const [stats, setStats] = useState<Stats>({
     totalMateriales: 0,
     ordenesPendientes: 0,
-    gastosMes: 0,
+    totalIngresos: 0,
+    totalGastos: 0,
     totalProveedores: 0,
     lowStockCount: 0,
   });
@@ -46,21 +48,24 @@ export default function ProjectDashboardPage() {
           setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || '');
         }
 
-        const [materialesRes, ordenesRes, gastosRes, proveedoresRes, lowStockRes] =
+        const [materialesRes, ordenesRes, ingresosRes, gastosRes, proveedoresRes, lowStockRes] =
           await Promise.all([
             supabase.from('materiales').select('id', { count: 'exact', head: true }),
             supabase.from('ordenes_compra').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente').eq('proyecto_id', projectId),
+            supabase.from('ingresos').select('monto').eq('proyecto_id', projectId),
             supabase.from('gastos').select('monto').eq('proyecto_id', projectId),
             supabase.from('proveedores').select('id', { count: 'exact', head: true }),
             supabase.from('materiales').select('id', { count: 'exact', head: true }).lt('cantidad', 5),
           ]);
 
+        const ingresoTotal = ingresosRes.data?.reduce((sum, g) => sum + (g.monto || 0), 0) ?? 0;
         const gastoTotal = gastosRes.data?.reduce((sum, g) => sum + (g.monto || 0), 0) ?? 0;
 
         setStats({
           totalMateriales: materialesRes.count ?? 0,
           ordenesPendientes: ordenesRes.count ?? 0,
-          gastosMes: gastoTotal,
+          totalIngresos: ingresoTotal,
+          totalGastos: gastoTotal,
           totalProveedores: proveedoresRes.count ?? 0,
           lowStockCount: lowStockRes.count ?? 0,
         });
@@ -76,12 +81,20 @@ export default function ProjectDashboardPage() {
 
   const statCards = [
     {
-      label: 'Total Materiales',
-      value: stats.totalMateriales,
-      icon: Package,
-      format: 'number' as const,
-      color: 'from-[#1a365d] to-[#2a4a7f]',
-      href: `${base}/inventario`,
+      label: 'Total Ingresos',
+      value: stats.totalIngresos,
+      icon: TrendingUp,
+      format: 'currency' as const,
+      color: 'from-[#16a34a] to-[#22c55e]',
+      href: `${base}/ingresos`,
+    },
+    {
+      label: 'Total Gastos',
+      value: stats.totalGastos,
+      icon: DollarSign,
+      format: 'currency' as const,
+      color: 'from-[#8B1A1A] to-[#A52222]',
+      href: `${base}/gastos`,
     },
     {
       label: 'Órdenes Pendientes',
@@ -92,12 +105,12 @@ export default function ProjectDashboardPage() {
       href: `${base}/ordenes`,
     },
     {
-      label: 'Total Gastos',
-      value: stats.gastosMes,
-      icon: DollarSign,
-      format: 'currency' as const,
-      color: 'from-[#8B1A1A] to-[#A52222]',
-      href: `${base}/gastos`,
+      label: 'Total Materiales',
+      value: stats.totalMateriales,
+      icon: Package,
+      format: 'number' as const,
+      color: 'from-[#1a365d] to-[#2a4a7f]',
+      href: `${base}/inventario`,
     },
     {
       label: 'Proveedores',
@@ -110,9 +123,10 @@ export default function ProjectDashboardPage() {
   ];
 
   const quickActions = [
-    { label: 'Nuevo Material', href: `${base}/inventario`, icon: Package },
-    { label: 'Nueva Orden', href: `${base}/ordenes`, icon: ShoppingCart },
+    { label: 'Registrar Ingreso', href: `${base}/ingresos`, icon: TrendingUp },
     { label: 'Registrar Gasto', href: `${base}/gastos`, icon: DollarSign },
+    { label: 'Nueva Orden', href: `${base}/ordenes`, icon: ShoppingCart },
+    { label: 'Nuevo Material', href: `${base}/inventario`, icon: Package },
     { label: 'Nuevo Proveedor', href: `${base}/proveedores`, icon: Truck },
   ];
 
@@ -156,7 +170,7 @@ export default function ProjectDashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
           return (
@@ -222,7 +236,7 @@ export default function ProjectDashboardPage() {
           <Plus size={16} />
           Acciones Rápidas
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {quickActions.map((action) => {
             const Icon = action.icon;
             return (

@@ -103,6 +103,31 @@ export interface Gasto {
   created_at: string;
 }
 
+export type MetodoPago = 'transferencia' | 'efectivo' | 'cheque' | 'otro';
+
+export interface Ingreso {
+  id: string;
+  concepto: string;
+  monto: number;
+  fecha: string;
+  mes: number;
+  anio: number;
+  cliente: string | null;
+  metodo_pago: MetodoPago | null;
+  factura: string | null;
+  notas: string | null;
+  proyecto_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export const METODOS_PAGO: Record<MetodoPago, string> = {
+  transferencia: 'Transferencia',
+  efectivo: 'Efectivo',
+  cheque: 'Cheque',
+  otro: 'Otro',
+};
+
 export const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
