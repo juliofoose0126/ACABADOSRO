@@ -146,6 +146,7 @@ export interface Empleado {
   id: string;
   nombre_completo: string;
   puesto: string;
+  curp: string | null;
   estado: 'activo' | 'baja';
   fecha_alta: string;
   fecha_baja: string | null;

@@ -4,26 +4,32 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
   Plus, Edit2, Trash2, UserCheck, UserX, Eye, Upload, X,
-  FileText, Download, HardHat, Search,
+  FileText, Download, HardHat, Search, CheckSquare, Square,
+  MessageCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
   Empleado, EmpleadoDocumento, TipoDocEmpleado, TIPOS_DOCUMENTO,
 } from '@/lib/types';
-import { formatDate } from '@/lib/export-utils';
+import { exportToExcel, formatDate } from '@/lib/export-utils';
 import Modal from '@/components/Modal';
 
 interface EmpleadoForm {
   nombre_completo: string;
   puesto: string;
+  curp: string;
   fecha_alta: string;
 }
 
 const emptyForm: EmpleadoForm = {
   nombre_completo: '',
   puesto: '',
+  curp: '',
   fecha_alta: new Date().toISOString().split('T')[0],
 };
+
+const CURP_REGEX = /[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/;
+const WHATSAPP_NUMBER = '525611317288';
 
 interface Toast {
   id: number;
@@ -40,10 +46,14 @@ export default function EmpleadosPage() {
   const [filterEstado, setFilterEstado] = useState<'todos' | 'activo' | 'baja'>('todos');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Selection for bulk baja
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDocsModal, setShowDocsModal] = useState(false);
   const [showBajaModal, setShowBajaModal] = useState(false);
+  const [showBulkBajaModal, setShowBulkBajaModal] = useState(false);
 
   const [editingEmpleado, setEditingEmpleado] = useState<Empleado | null>(null);
   const [deletingEmpleado, setDeletingEmpleado] = useState<Empleado | null>(null);
@@ -59,6 +69,7 @@ export default function EmpleadosPage() {
   const [documentos, setDocumentos] = useState<EmpleadoDocumento[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploading, setUploading] = useState<TipoDocEmpleado | null>(null);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTipo, setUploadTipo] = useState<TipoDocEmpleado>('constancia_fiscal');
 
@@ -106,7 +117,28 @@ export default function EmpleadosPage() {
     e.puesto.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // CRUD handlers
+  // --- Selection ---
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const activeFiltered = filteredEmpleados.filter((e) => e.estado === 'activo');
+    if (activeFiltered.every((e) => selectedIds.has(e.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(activeFiltered.map((e) => e.id)));
+    }
+  };
+
+  const selectedEmpleados = empleados.filter((e) => selectedIds.has(e.id));
+
+  // --- CRUD ---
   const openAddModal = () => {
     setEditingEmpleado(null);
     setForm(emptyForm);
@@ -118,6 +150,7 @@ export default function EmpleadosPage() {
     setForm({
       nombre_completo: emp.nombre_completo,
       puesto: emp.puesto,
+      curp: emp.curp ?? '',
       fecha_alta: emp.fecha_alta,
     });
     setShowFormModal(true);
@@ -142,7 +175,10 @@ export default function EmpleadosPage() {
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [name]: name === 'curp' ? value.toUpperCase() : value,
+    }));
   };
 
   const handleSave = async () => {
@@ -156,6 +192,7 @@ export default function EmpleadosPage() {
       const payload = {
         nombre_completo: form.nombre_completo.trim(),
         puesto: form.puesto.trim(),
+        curp: form.curp.trim() || null,
         fecha_alta: form.fecha_alta,
         proyecto_id: projectId,
       };
@@ -239,7 +276,64 @@ export default function EmpleadosPage() {
     }
   };
 
-  // Document handlers
+  // --- Bulk Baja + WhatsApp ---
+  const handleBulkBaja = async () => {
+    if (selectedEmpleados.length === 0) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('empleados')
+        .update({ estado: 'baja', fecha_baja: fechaBaja })
+        .in('id', Array.from(selectedIds));
+      if (error) throw error;
+
+      const nombres = selectedEmpleados.map((e, i) => `${i + 1}. ${e.nombre_completo} - ${e.puesto}`).join('\n');
+      const mensaje = `Solicito dar de baja a los siguientes trabajadores:\n\n${nombres}\n\nFecha de baja: ${fechaBaja}`;
+      const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(mensaje)}`;
+      window.open(waUrl, '_blank');
+
+      showToast(`${selectedEmpleados.length} empleado(s) dado(s) de baja`, 'success');
+      setShowBulkBajaModal(false);
+      setSelectedIds(new Set());
+      fetchEmpleados();
+    } catch (err) {
+      console.error('Error bulk baja:', err);
+      showToast('Error al procesar las bajas', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // --- Excel Export ---
+  const handleExport = () => {
+    if (filteredEmpleados.length === 0) {
+      showToast('No hay empleados para exportar', 'error');
+      return;
+    }
+
+    const headers = [
+      { key: 'nombre', label: 'Nombre Completo' },
+      { key: 'puesto', label: 'Puesto' },
+      { key: 'curp', label: 'CURP' },
+      { key: 'estado', label: 'Estado' },
+      { key: 'fecha_alta', label: 'Fecha de Alta' },
+      { key: 'fecha_baja', label: 'Fecha de Baja' },
+    ];
+
+    const data = filteredEmpleados.map((e) => ({
+      nombre: e.nombre_completo,
+      puesto: e.puesto,
+      curp: e.curp ?? '',
+      estado: e.estado === 'activo' ? 'Activo' : 'Baja',
+      fecha_alta: formatDate(e.fecha_alta),
+      fecha_baja: e.fecha_baja ? formatDate(e.fecha_baja) : '',
+    }));
+
+    exportToExcel(data, headers, 'Empleados_Acabados_RO', 'Empleados', 'Acabados RO — Lista de Empleados');
+    showToast('Excel exportado correctamente', 'success');
+  };
+
+  // --- Document handlers ---
   const fetchDocumentos = async (empleadoId: string) => {
     setLoadingDocs(true);
     try {
@@ -262,11 +356,29 @@ export default function EmpleadosPage() {
     fileInputRef.current?.click();
   };
 
+  const extractCurpFromImage = async (file: File): Promise<string | null> => {
+    if (!file.type.startsWith('image/')) return null;
+    try {
+      setOcrProcessing(true);
+      showToast('Leyendo CURP de la imagen...', 'success');
+      const Tesseract = await import('tesseract.js');
+      const { data: { text } } = await Tesseract.recognize(file, 'spa');
+      const cleaned = text.replace(/\s/g, '').toUpperCase();
+      const match = cleaned.match(CURP_REGEX);
+      return match ? match[0] : null;
+    } catch (err) {
+      console.error('OCR error:', err);
+      return null;
+    } finally {
+      setOcrProcessing(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedEmpleado) return;
 
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       showToast('El archivo no debe superar 10MB', 'error');
       return;
@@ -280,7 +392,6 @@ export default function EmpleadosPage() {
       const { error: uploadError } = await supabase.storage
         .from('empleados-docs')
         .upload(storagePath, file);
-
       if (uploadError) throw uploadError;
 
       const { error: dbError } = await supabase
@@ -291,10 +402,26 @@ export default function EmpleadosPage() {
           nombre_archivo: file.name,
           storage_path: storagePath,
         });
-
       if (dbError) throw dbError;
 
-      showToast(`${TIPOS_DOCUMENTO[uploadTipo]} subido correctamente`, 'success');
+      // OCR for CURP documents
+      if (uploadTipo === 'curp' && file.type.startsWith('image/')) {
+        const curpDetected = await extractCurpFromImage(file);
+        if (curpDetected) {
+          await supabase
+            .from('empleados')
+            .update({ curp: curpDetected })
+            .eq('id', selectedEmpleado.id);
+          setSelectedEmpleado({ ...selectedEmpleado, curp: curpDetected });
+          showToast(`CURP detectado: ${curpDetected}`, 'success');
+          fetchEmpleados();
+        } else {
+          showToast('CURP subido. No se pudo leer automáticamente — ingrésalo manualmente.', 'error');
+        }
+      } else {
+        showToast(`${TIPOS_DOCUMENTO[uploadTipo]} subido correctamente`, 'success');
+      }
+
       await fetchDocumentos(selectedEmpleado.id);
     } catch (err) {
       console.error('Error uploading:', err);
@@ -310,7 +437,6 @@ export default function EmpleadosPage() {
       const { data, error } = await supabase.storage
         .from('empleados-docs')
         .createSignedUrl(doc.storage_path, 300);
-
       if (error) throw error;
       window.open(data.signedUrl, '_blank');
     } catch (err) {
@@ -324,7 +450,6 @@ export default function EmpleadosPage() {
       const { data, error } = await supabase.storage
         .from('empleados-docs')
         .download(doc.storage_path);
-
       if (error) throw error;
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
@@ -390,16 +515,25 @@ export default function EmpleadosPage() {
             Altas, bajas y documentación de trabajadores
           </p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
-        >
-          <Plus size={16} />
-          Alta de Empleado
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#1a365d] px-4 py-2.5 text-sm font-medium text-[#1a365d] transition-colors hover:bg-[#1a365d]/5"
+          >
+            <Download size={16} />
+            Exportar Excel
+          </button>
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+          >
+            <Plus size={16} />
+            Alta de Empleado
+          </button>
+        </div>
       </div>
 
-      {/* Stats + Filters */}
+      {/* Stats */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4 shadow-sm ring-1 ring-gray-100">
           <p className="text-xs font-medium text-gray-500">Activos</p>
@@ -446,6 +580,33 @@ export default function EmpleadosPage() {
         </div>
       </div>
 
+      {/* Bulk Baja Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-[#8B1A1A]/20 bg-[#8B1A1A]/5 px-4 py-3">
+          <p className="text-sm font-medium text-[#8B1A1A]">
+            {selectedIds.size} empleado{selectedIds.size !== 1 ? 's' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            >
+              Deseleccionar
+            </button>
+            <button
+              onClick={() => {
+                setFechaBaja(new Date().toISOString().split('T')[0]);
+                setShowBulkBajaModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B1A1A] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#A52222]"
+            >
+              <MessageCircle size={14} />
+              Dar de Baja y Notificar por WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Card View */}
       <div className="space-y-3 md:hidden">
         {loading ? (
@@ -467,10 +628,20 @@ export default function EmpleadosPage() {
                 emp.estado === 'activo' ? 'border-l-[#16a34a]' : 'border-l-[#8B1A1A]'
               } bg-white p-4 shadow-sm ring-1 ring-gray-100`}
             >
-              <div className="mb-2 flex items-start justify-between">
-                <div>
+              <div className="mb-2 flex items-start gap-3">
+                {emp.estado === 'activo' && (
+                  <button onClick={() => toggleSelect(emp.id)} className="mt-0.5 shrink-0">
+                    {selectedIds.has(emp.id) ? (
+                      <CheckSquare size={18} className="text-[#8B1A1A]" />
+                    ) : (
+                      <Square size={18} className="text-gray-300" />
+                    )}
+                  </button>
+                )}
+                <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{emp.nombre_completo}</p>
                   <p className="mt-0.5 text-xs text-gray-500">{emp.puesto}</p>
+                  {emp.curp && <p className="mt-0.5 font-mono text-xs text-gray-400">{emp.curp}</p>}
                   <div className="mt-1 flex items-center gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       emp.estado === 'activo'
@@ -517,8 +688,19 @@ export default function EmpleadosPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="px-3 py-3 text-center">
+                  <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
+                    {filteredEmpleados.filter((e) => e.estado === 'activo').length > 0 &&
+                     filteredEmpleados.filter((e) => e.estado === 'activo').every((e) => selectedIds.has(e.id)) ? (
+                      <CheckSquare size={16} className="text-[#8B1A1A]" />
+                    ) : (
+                      <Square size={16} />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Nombre Completo</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Puesto</th>
+                <th className="px-4 py-3 font-semibold text-gray-600">CURP</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Estado</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Fecha Alta</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Fecha Baja</th>
@@ -529,7 +711,7 @@ export default function EmpleadosPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-100">
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <span className="inline-block h-4 w-full max-w-[120px] animate-pulse rounded bg-gray-200" />
                       </td>
@@ -538,16 +720,31 @@ export default function EmpleadosPage() {
                 ))
               ) : filteredEmpleados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                     No se encontraron empleados.
                   </td>
                 </tr>
               ) : (
                 filteredEmpleados.map((emp) => (
-                  <tr key={emp.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50">
+                  <tr key={emp.id} className={`border-b border-gray-100 transition-colors hover:bg-gray-50 ${
+                    selectedIds.has(emp.id) ? 'bg-red-50/30' : ''
+                  }`}>
+                    <td className="px-3 py-3 text-center">
+                      {emp.estado === 'activo' ? (
+                        <button onClick={() => toggleSelect(emp.id)}>
+                          {selectedIds.has(emp.id) ? (
+                            <CheckSquare size={16} className="text-[#8B1A1A]" />
+                          ) : (
+                            <Square size={16} className="text-gray-300 hover:text-gray-500" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="inline-block w-4" />
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       <div className="flex items-center gap-2">
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
                           emp.estado === 'activo' ? 'bg-[#16a34a]' : 'bg-gray-400'
                         }`}>
                           {emp.nombre_completo.charAt(0).toUpperCase()}
@@ -556,6 +753,9 @@ export default function EmpleadosPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{emp.puesto}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">
+                      {emp.curp || <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         emp.estado === 'activo'
@@ -621,31 +821,51 @@ export default function EmpleadosPage() {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Puesto <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="puesto"
-              value={form.puesto}
-              onChange={handleFormChange}
-              placeholder="Puesto o cargo"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Puesto <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="puesto"
+                value={form.puesto}
+                onChange={handleFormChange}
+                placeholder="Puesto o cargo"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Fecha de Alta <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="fecha_alta"
+                value={form.fecha_alta}
+                onChange={handleFormChange}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              />
+            </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Fecha de Alta <span className="text-red-500">*</span>
+              CURP
             </label>
             <input
-              type="date"
-              name="fecha_alta"
-              value={form.fecha_alta}
+              type="text"
+              name="curp"
+              value={form.curp}
               onChange={handleFormChange}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              placeholder="Se llena automáticamente al subir foto del CURP"
+              maxLength={18}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm uppercase text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
             />
+            <p className="mt-1 text-xs text-gray-400">
+              Se detecta automáticamente al subir la foto del CURP en documentos, o puedes ingresarlo manualmente.
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
@@ -666,7 +886,7 @@ export default function EmpleadosPage() {
         </div>
       </Modal>
 
-      {/* Baja Modal */}
+      {/* Single Baja Modal */}
       <Modal
         isOpen={showBajaModal}
         onClose={() => { setShowBajaModal(false); setBajaEmpleado(null); }}
@@ -679,26 +899,63 @@ export default function EmpleadosPage() {
           </p>
           <div className="mt-4">
             <label className="mb-1 block text-sm font-medium text-gray-700">Fecha de Baja</label>
-            <input
-              type="date"
-              value={fechaBaja}
-              onChange={(e) => setFechaBaja(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
-            />
+            <input type="date" value={fechaBaja} onChange={(e) => setFechaBaja(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]" />
           </div>
           <div className="mt-6 flex justify-end gap-3">
-            <button
-              onClick={() => { setShowBajaModal(false); setBajaEmpleado(null); }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
+            <button onClick={() => { setShowBajaModal(false); setBajaEmpleado(null); }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancelar
             </button>
-            <button
-              onClick={handleBaja}
-              disabled={saving}
-              className="rounded-lg bg-[#8B1A1A] px-4 py-2 text-sm font-medium text-white hover:bg-[#A52222] disabled:opacity-50"
-            >
+            <button onClick={handleBaja} disabled={saving}
+              className="rounded-lg bg-[#8B1A1A] px-4 py-2 text-sm font-medium text-white hover:bg-[#A52222] disabled:opacity-50">
               {saving ? 'Procesando...' : 'Confirmar Baja'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Baja + WhatsApp Modal */}
+      <Modal
+        isOpen={showBulkBajaModal}
+        onClose={() => setShowBulkBajaModal(false)}
+        title="Dar de Baja Masiva"
+        size="lg"
+      >
+        <div>
+          <p className="text-sm text-gray-600">
+            Se dará de baja a los siguientes <span className="font-bold text-[#8B1A1A]">{selectedEmpleados.length}</span> trabajadores
+            y se enviará notificación por WhatsApp:
+          </p>
+          <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-gray-200 p-3">
+            {selectedEmpleados.map((emp, i) => (
+              <div key={emp.id} className="flex items-center gap-2 border-b border-gray-100 py-1.5 last:border-0">
+                <span className="text-xs font-bold text-gray-400">{i + 1}.</span>
+                <span className="text-sm font-medium text-gray-900">{emp.nombre_completo}</span>
+                <span className="text-xs text-gray-500">— {emp.puesto}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Fecha de Baja</label>
+            <input type="date" value={fechaBaja} onChange={(e) => setFechaBaja(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]" />
+          </div>
+          <div className="mt-4 rounded-lg bg-green-50 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-green-800">
+              <MessageCircle size={14} />
+              Se abrirá WhatsApp con el mensaje de baja al número 56 1131 7288
+            </p>
+          </div>
+          <div className="mt-6 flex justify-end gap-3">
+            <button onClick={() => setShowBulkBajaModal(false)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button onClick={handleBulkBaja} disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#8B1A1A] px-4 py-2 text-sm font-medium text-white hover:bg-[#A52222] disabled:opacity-50">
+              <MessageCircle size={16} />
+              {saving ? 'Procesando...' : 'Confirmar Bajas y Enviar WhatsApp'}
             </button>
           </div>
         </div>
@@ -717,17 +974,12 @@ export default function EmpleadosPage() {
             Se eliminarán también todos sus documentos. Esta acción no se puede deshacer.
           </p>
           <div className="mt-6 flex justify-end gap-3">
-            <button
-              onClick={() => { setShowDeleteModal(false); setDeletingEmpleado(null); }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
+            <button onClick={() => { setShowDeleteModal(false); setDeletingEmpleado(null); }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancelar
             </button>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-            >
+            <button onClick={handleDelete} disabled={deleting}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </button>
           </div>
@@ -747,11 +999,26 @@ export default function EmpleadosPage() {
               <HardHat size={14} className="mr-1 inline text-[#1a365d]" />
               {selectedEmpleado?.puesto}
             </p>
+            {selectedEmpleado?.curp && (
+              <p className="mt-0.5 font-mono text-xs text-gray-500">
+                CURP: {selectedEmpleado.curp}
+              </p>
+            )}
             <p className="mt-0.5 text-xs text-gray-500">
               Alta: {selectedEmpleado ? formatDate(selectedEmpleado.fecha_alta) : ''}
               {selectedEmpleado?.fecha_baja && ` — Baja: ${formatDate(selectedEmpleado.fecha_baja)}`}
             </p>
           </div>
+
+          {ocrProcessing && (
+            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+              <svg className="h-4 w-4 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-xs font-medium text-blue-700">Leyendo CURP de la imagen...</span>
+            </div>
+          )}
 
           {loadingDocs ? (
             <div className="space-y-3">
@@ -770,6 +1037,11 @@ export default function EmpleadosPage() {
                     <div className="mb-2 flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-gray-800">
                         {TIPOS_DOCUMENTO[tipo]}
+                        {tipo === 'curp' && (
+                          <span className="ml-2 text-xs font-normal text-blue-500">
+                            (sube foto para leer automáticamente)
+                          </span>
+                        )}
                       </h4>
                       <button
                         onClick={() => handleUploadClick(tipo)}
@@ -793,33 +1065,16 @@ export default function EmpleadosPage() {
                     ) : (
                       <div className="space-y-1.5">
                         {docs.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2"
-                          >
+                          <div key={doc.id} className="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2">
                             <FileText size={14} className="shrink-0 text-[#1a365d]" />
-                            <span className="flex-1 truncate text-xs text-gray-700">
-                              {doc.nombre_archivo}
-                            </span>
-                            <button
-                              onClick={() => handleViewDoc(doc)}
-                              className="rounded p-1 text-gray-400 transition-colors hover:text-blue-600"
-                              title="Ver"
-                            >
+                            <span className="flex-1 truncate text-xs text-gray-700">{doc.nombre_archivo}</span>
+                            <button onClick={() => handleViewDoc(doc)} className="rounded p-1 text-gray-400 hover:text-blue-600" title="Ver">
                               <Eye size={14} />
                             </button>
-                            <button
-                              onClick={() => handleDownloadDoc(doc)}
-                              className="rounded p-1 text-gray-400 transition-colors hover:text-green-600"
-                              title="Descargar"
-                            >
+                            <button onClick={() => handleDownloadDoc(doc)} className="rounded p-1 text-gray-400 hover:text-green-600" title="Descargar">
                               <Download size={14} />
                             </button>
-                            <button
-                              onClick={() => handleDeleteDoc(doc)}
-                              className="rounded p-1 text-gray-400 transition-colors hover:text-red-600"
-                              title="Eliminar"
-                            >
+                            <button onClick={() => handleDeleteDoc(doc)} className="rounded p-1 text-gray-400 hover:text-red-600" title="Eliminar">
                               <X size={14} />
                             </button>
                           </div>
