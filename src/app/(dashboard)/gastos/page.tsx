@@ -473,8 +473,63 @@ export default function GastosPage() {
         </div>
       </div>
 
-      {/* Data Table */}
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
+      {/* Mobile Card View */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                <div className="mb-2 h-4 w-3/4 rounded bg-gray-200" />
+                <div className="h-4 w-1/2 rounded bg-gray-200" />
+              </div>
+            ))}
+          </div>
+        ) : gastos.length === 0 ? (
+          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-sm text-gray-400 shadow-sm ring-1 ring-gray-100">
+            No se encontraron gastos para los filtros seleccionados.
+          </div>
+        ) : (
+          gastos.map((gasto) => (
+            <div key={gasto.id} className={`rounded-xl border-l-4 ${CATEGORIA_COLORS[gasto.categoria].border} bg-white p-4 shadow-sm ring-1 ring-gray-100`}>
+              <div className="mb-2 flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{gasto.concepto}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORIA_COLORS[gasto.categoria].bg} ${CATEGORIA_COLORS[gasto.categoria].text}`}>
+                      {CATEGORIAS_GASTO[gasto.categoria]}
+                    </span>
+                    <span className="text-xs text-gray-500">{formatDate(gasto.fecha)}</span>
+                  </div>
+                </div>
+                <p className="text-base font-bold text-gray-900">{formatCurrency(gasto.monto)}</p>
+              </div>
+              {(gasto.proveedor || gasto.notas) && (
+                <div className="mb-2 space-y-0.5 text-xs text-gray-500">
+                  {gasto.proveedor && <p>Proveedor: {gasto.proveedor}</p>}
+                  {gasto.notas && <p className="truncate">{gasto.notas}</p>}
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-1 border-t border-gray-100 pt-2">
+                <button
+                  onClick={() => openEditModal(gasto)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#1a365d] transition-colors active:bg-gray-100"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => openDeleteModal(gasto)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors active:bg-red-50"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -482,10 +537,10 @@ export default function GastosPage() {
                 <th className="px-4 py-3 font-semibold text-gray-600">Fecha</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Categoria</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Concepto</th>
-                <th className="px-4 py-3 font-semibold text-gray-600 text-right">Monto</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">Monto</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Proveedor</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Notas</th>
-                <th className="px-4 py-3 font-semibold text-gray-600 text-center">Acciones</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600">Acciones</th>
               </tr>
             </thead>
             <tbody>

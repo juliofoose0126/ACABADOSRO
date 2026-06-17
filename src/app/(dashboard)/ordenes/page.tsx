@@ -414,7 +414,7 @@ export default function OrdenesPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 pt-10 md:pt-0">
       {/* Toast notifications */}
       <div className="fixed right-4 top-4 z-[200] flex flex-col gap-2">
         {toasts.map((t) => (
@@ -474,8 +474,54 @@ export default function OrdenesPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      {/* Mobile Card View */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-gray-400">Cargando...</div>
+        ) : ordenesFiltradas.length === 0 ? (
+          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-gray-400 shadow-sm ring-1 ring-gray-100">
+            No se encontraron órdenes
+          </div>
+        ) : (
+          ordenesFiltradas.map((orden) => (
+            <div key={orden.id} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-bold text-[#1a365d]">{orden.numero_orden}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{orden.proveedores?.nombre ?? 'Sin proveedor'}</p>
+                </div>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[orden.estado]}`}>
+                  {ESTADO_LABELS[orden.estado]}
+                </span>
+              </div>
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <span className="text-gray-500">{formatDate(orden.fecha)}</span>
+                <span className="font-bold text-gray-900">{formatCurrency(orden.total)}</span>
+              </div>
+              <div className="flex items-center gap-1 border-t border-gray-100 pt-3">
+                <button onClick={() => openDetail(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
+                  <Eye size={14} className="mx-auto mb-0.5" />Ver
+                </button>
+                <button onClick={() => openEstadoModal(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
+                  <ShoppingCart size={14} className="mx-auto mb-0.5" />Estado
+                </button>
+                <button onClick={() => handleExportPDF(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
+                  <FileText size={14} className="mx-auto mb-0.5" />PDF
+                </button>
+                <button onClick={() => handleExportExcel(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
+                  <FileSpreadsheet size={14} className="mx-auto mb-0.5" />Excel
+                </button>
+                <button onClick={() => handleDelete(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-red-600 transition-colors active:bg-red-50">
+                  <Trash2 size={14} className="mx-auto mb-0.5" />Borrar
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -737,7 +783,7 @@ export default function OrdenesPage() {
 
           {/* Totals */}
           <div className="flex justify-end">
-            <div className="w-64 space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="w-full space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:w-64">
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Subtotal</span>
                 <span>{formatCurrency(formSubtotal)}</span>
@@ -821,8 +867,30 @@ export default function OrdenesPage() {
               </div>
             </div>
 
-            {/* Items table */}
-            <div className="overflow-hidden rounded-lg border border-gray-200">
+            {/* Items - Mobile cards */}
+            <div className="space-y-2 sm:hidden">
+              {detailItems.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-400">Sin items</p>
+              ) : (
+                detailItems.map((item, idx) => (
+                  <div key={item.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="mb-1 flex items-start justify-between">
+                      <p className="text-sm font-medium text-gray-900">
+                        {idx + 1}. {item.descripcion_item}
+                      </p>
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(item.subtotal)}</p>
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-500">
+                      <span>{item.cantidad} {item.unidad}</span>
+                      <span>@ {formatCurrency(item.precio_unitario)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Items - Desktop table */}
+            <div className="hidden overflow-hidden rounded-lg border border-gray-200 sm:block">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">

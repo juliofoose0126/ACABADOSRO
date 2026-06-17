@@ -12,10 +12,10 @@ interface ModalProps {
 }
 
 const sizeClasses: Record<string, string> = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-4xl',
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-lg',
+  xl: 'sm:max-w-4xl',
 };
 
 export default function Modal({
@@ -44,20 +44,24 @@ export default function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
       <div
-        className="absolute inset-0 bg-[#0f2440]/60 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 bg-[#0f2440]/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
       <div
-        className={`animate-scale-in relative w-full ${sizeClasses[size]} rounded-2xl border border-gray-200 bg-white shadow-2xl`}
+        className={`animate-scale-in relative flex w-full flex-col bg-white shadow-2xl sm:rounded-2xl sm:border sm:border-gray-200 ${sizeClasses[size]} max-h-[95vh] rounded-t-2xl sm:max-h-[85vh]`}
       >
-        {/* Gold accent line */}
         <div className="absolute left-0 right-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-[#D4A520] via-[#E8B82E] to-[#D4A520]" />
 
-        <div className="flex items-center justify-between px-6 pb-3 pt-5">
-          <h2 className="text-lg font-bold text-[#1a365d]">{title}</h2>
+        {/* Mobile drag handle */}
+        <div className="flex justify-center pb-0 pt-2 sm:hidden">
+          <div className="h-1 w-10 rounded-full bg-gray-300" />
+        </div>
+
+        <div className="flex items-center justify-between px-4 pb-3 pt-3 sm:px-6 sm:pt-5">
+          <h2 className="text-base font-bold text-[#1a365d] sm:text-lg">{title}</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
@@ -67,7 +71,7 @@ export default function Modal({
           </button>
         </div>
 
-        <div className="px-6 pb-6">{children}</div>
+        <div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">{children}</div>
       </div>
     </div>
   );
