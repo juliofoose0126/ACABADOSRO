@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Proveedor } from '@/lib/types';
 import Modal from '@/components/Modal';
@@ -16,6 +16,8 @@ import {
   MapPin,
   User,
   FileText,
+  Upload,
+  Camera,
 } from 'lucide-react';
 
 interface FormData {
@@ -36,6 +38,92 @@ const emptyForm: FormData = {
   direccion: '',
 };
 
+const RFC_REGEX = /[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}/;
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+const PHONE_REGEX = /(?:\+?\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{2,4}/g;
+
+function extractProveedorFromText(text: string): Partial<FormData> {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const fullText = text.toUpperCase();
+  const result: Partial<FormData> = {};
+
+  const rfcMatch = fullText.replace(/\s/g, '').match(RFC_REGEX);
+  if (rfcMatch) result.rfc = rfcMatch[0];
+
+  const emailMatch = text.match(EMAIL_REGEX);
+  if (emailMatch) result.email = emailMatch[0].toLowerCase();
+
+  const phones: string[] = [];
+  for (const line of lines) {
+    const cleaned = line.replace(/[^0-9+() .\-/]/g, '').trim();
+    if (cleaned.length >= 8) {
+      const matches = line.match(PHONE_REGEX);
+      if (matches) phones.push(...matches.map((m) => m.trim()));
+    }
+  }
+  const uniquePhones = [...new Set(phones)].filter((p) => p.replace(/\D/g, '').length >= 8);
+  if (uniquePhones.length > 0) result.telefono = uniquePhones.join(' / ');
+
+  const addressKeywords = /calle|av\.|avenida|col\.|colonia|c\.p\.|cp |no\.|num\.|número|#|mz\.|manzana|lote|blvd|boulevard|piso|despacho|int\.|interior|ext\./i;
+  const stateKeywords = /aguascalientes|baja california|campeche|chiapas|chihuahua|coahuila|colima|durango|guanajuato|guerrero|hidalgo|jalisco|méxico|michoacán|morelos|nayarit|nuevo león|oaxaca|puebla|querétaro|quintana roo|san luis potosí|sinaloa|sonora|tabasco|tamaulipas|tlaxcala|veracruz|yucatán|zacatecas|cdmx|cmx|ciudad de méxico|edo\. de mex|n\.l\.|nl\b|qro|gto|jal/i;
+
+  for (const line of lines) {
+    if (addressKeywords.test(line) || stateKeywords.test(line)) {
+      if (!line.match(RFC_REGEX) && !line.match(EMAIL_REGEX) && line.length > 10) {
+        result.direccion = (result.direccion ? result.direccion + ', ' : '') + line;
+      }
+    }
+  }
+
+  const contactKeywords = /asesor|vendedor|contacto|atención|representante|ejecutiv/i;
+  for (const line of lines) {
+    if (contactKeywords.test(line)) {
+      const parts = line.split(/:\s*/);
+      if (parts.length > 1) {
+        result.contacto = parts.slice(1).join(': ').trim();
+        break;
+      }
+    }
+  }
+
+  const skipPatterns = [RFC_REGEX, EMAIL_REGEX, addressKeywords, /^\d+$/, /^tel|^fax|^cel|^oficina|^banco|^cuenta|^clabe|^fecha|^número|^cotización|^subtotal|^iva|^total|^producto|^cantidad|^precio|^importe|^impuesto/i];
+  if (!result.contacto) {
+    for (const line of lines) {
+      const words = line.split(/\s+/);
+      const isName = words.length >= 2 && words.length <= 5 &&
+        words.every((w) => /^[A-ZÁÉÍÓÚÑa-záéíóúñ.]+$/.test(w)) &&
+        words.some((w) => w.length > 2);
+      if (isName && !skipPatterns.some((p) => p.test(line))) {
+        if (!result.nombre) {
+          result.nombre = line;
+        } else if (!result.contacto) {
+          result.contacto = line;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!result.nombre) {
+    for (const line of lines) {
+      if (/s\.?a\.?\s*de\s*c\.?v|s\.?\s*de\s*r\.?l|s\.?c\./i.test(line)) {
+        result.nombre = line;
+        break;
+      }
+    }
+  }
+  if (!result.nombre && lines.length > 0) {
+    for (const line of lines) {
+      if (line.length > 5 && !skipPatterns.some((p) => p.test(line)) && !/^\d/.test(line)) {
+        result.nombre = line;
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +134,8 @@ export default function ProveedoresPage() {
   const [deletingProveedor, setDeletingProveedor] = useState<Proveedor | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -98,6 +188,48 @@ export default function ProveedoresPage() {
   const openDeleteModal = (proveedor: Proveedor) => {
     setDeletingProveedor(proveedor);
     setShowDeleteModal(true);
+  };
+
+  const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setToast({ message: 'Solo se aceptan imágenes', type: 'error' });
+      return;
+    }
+
+    setOcrProcessing(true);
+    setToast({ message: 'Analizando imagen... esto puede tomar unos segundos', type: 'info' });
+
+    try {
+      const Tesseract = await import('tesseract.js');
+      const { data: { text } } = await Tesseract.recognize(file, 'spa');
+
+      const extracted = extractProveedorFromText(text);
+
+      setFormData((prev) => ({
+        nombre: extracted.nombre || prev.nombre,
+        rfc: extracted.rfc || prev.rfc,
+        contacto: extracted.contacto || prev.contacto,
+        telefono: extracted.telefono || prev.telefono,
+        email: extracted.email || prev.email,
+        direccion: extracted.direccion || prev.direccion,
+      }));
+
+      const fieldsFound = Object.values(extracted).filter(Boolean).length;
+      if (fieldsFound > 0) {
+        setToast({ message: `Se extrajeron ${fieldsFound} dato${fieldsFound !== 1 ? 's' : ''} de la imagen. Verifica y corrige si es necesario.`, type: 'success' });
+      } else {
+        setToast({ message: 'No se pudieron extraer datos claros. Ingresa los datos manualmente.', type: 'error' });
+      }
+    } catch (err) {
+      console.error('OCR error:', err);
+      setToast({ message: 'Error al analizar la imagen', type: 'error' });
+    } finally {
+      setOcrProcessing(false);
+      if (ocrInputRef.current) ocrInputRef.current.value = '';
+    }
   };
 
   const handleSave = async () => {
@@ -322,6 +454,15 @@ export default function ProveedoresPage() {
         </div>
       )}
 
+      {/* Hidden OCR file input */}
+      <input
+        ref={ocrInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleOcrUpload}
+      />
+
       {/* Add/Edit Modal */}
       <Modal
         isOpen={showModal}
@@ -334,6 +475,45 @@ export default function ProveedoresPage() {
         size="lg"
       >
         <div className="space-y-4">
+          {/* OCR Upload Area */}
+          {!editingProveedor && (
+            <div className="rounded-lg border-2 border-dashed border-[#1a365d]/20 bg-[#1a365d]/3 p-4 transition-colors hover:border-[#1a365d]/40">
+              <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+                <div className="rounded-lg bg-[#1a365d]/10 p-3">
+                  <Camera size={24} className="text-[#1a365d]" />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-sm font-semibold text-[#1a365d]">
+                    Sube una imagen para llenar automáticamente
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Cotización, factura o tarjeta de presentación — se leerá el texto y extraerá los datos
+                  </p>
+                </div>
+                <button
+                  onClick={() => ocrInputRef.current?.click()}
+                  disabled={ocrProcessing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+                >
+                  {ocrProcessing ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Analizando...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Subir Imagen
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               Nombre <span className="text-red-500">*</span>
