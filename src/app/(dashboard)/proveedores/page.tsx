@@ -15,10 +15,12 @@ import {
   Mail,
   MapPin,
   User,
+  FileText,
 } from 'lucide-react';
 
 interface FormData {
   nombre: string;
+  rfc: string;
   contacto: string;
   telefono: string;
   email: string;
@@ -27,6 +29,7 @@ interface FormData {
 
 const emptyForm: FormData = {
   nombre: '',
+  rfc: '',
   contacto: '',
   telefono: '',
   email: '',
@@ -83,6 +86,7 @@ export default function ProveedoresPage() {
     setEditingProveedor(proveedor);
     setFormData({
       nombre: proveedor.nombre,
+      rfc: proveedor.rfc || '',
       contacto: proveedor.contacto || '',
       telefono: proveedor.telefono || '',
       email: proveedor.email || '',
@@ -106,6 +110,7 @@ export default function ProveedoresPage() {
     try {
       const payload = {
         nombre: formData.nombre.trim(),
+        rfc: formData.rfc.trim() || null,
         contacto: formData.contacto.trim() || null,
         telefono: formData.telefono.trim() || null,
         email: formData.email.trim() || null,
@@ -277,6 +282,12 @@ export default function ProveedoresPage() {
 
               {/* Card Body */}
               <div className="space-y-2.5 text-sm text-gray-600">
+                {proveedor.rfc && (
+                  <div className="flex items-center gap-2.5">
+                    <FileText size={15} className="shrink-0 text-gray-400" />
+                    <span className="font-mono text-xs">{proveedor.rfc}</span>
+                  </div>
+                )}
                 {proveedor.contacto && (
                   <div className="flex items-center gap-2.5">
                     <User size={15} className="shrink-0 text-gray-400" />
@@ -301,7 +312,8 @@ export default function ProveedoresPage() {
                     <span>{proveedor.direccion}</span>
                   </div>
                 )}
-                {!proveedor.contacto &&
+                {!proveedor.rfc &&
+                  !proveedor.contacto &&
                   !proveedor.telefono &&
                   !proveedor.email &&
                   !proveedor.direccion && (
@@ -338,6 +350,23 @@ export default function ProveedoresPage() {
               }
               placeholder="Nombre del proveedor"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+            />
+          </div>
+
+          {/* RFC */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              RFC
+            </label>
+            <input
+              type="text"
+              value={formData.rfc}
+              onChange={(e) =>
+                setFormData({ ...formData, rfc: e.target.value.toUpperCase() })
+              }
+              placeholder="XAXX010101000"
+              maxLength={13}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm text-gray-900 placeholder-gray-400 uppercase focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
             />
           </div>
 

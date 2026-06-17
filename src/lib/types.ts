@@ -32,6 +32,7 @@ export interface Material {
 export interface Proveedor {
   id: string;
   nombre: string;
+  rfc: string | null;
   contacto: string | null;
   telefono: string | null;
   email: string | null;
@@ -50,6 +51,9 @@ export interface OrdenCompra {
   iva: number;
   total: number;
   notas: string | null;
+  obra_proyecto: string | null;
+  vendedor: string | null;
+  folio_numero: number | null;
   created_by: string | null;
   created_at: string;
   proveedores?: Proveedor;
@@ -59,6 +63,7 @@ export interface OrdenDetalle {
   id: string;
   orden_id: string;
   material_id: string | null;
+  codigo_item: string | null;
   descripcion_item: string;
   cantidad: number;
   unidad: string;

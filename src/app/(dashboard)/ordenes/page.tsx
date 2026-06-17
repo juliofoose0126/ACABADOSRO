@@ -1,18 +1,21 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { OrdenCompra, OrdenDetalle, Material, Proveedor } from '@/lib/types';
-import { exportToExcel, exportOrdenCompraPDF, formatCurrency, formatDate } from '@/lib/export-utils';
+import { exportOCExcel, exportOCPDF, formatCurrency, formatDate, formatDateShort, type OCExportData } from '@/lib/export-utils';
 import Modal from '@/components/Modal';
 import {
   Plus,
   Eye,
+  Edit2,
   FileText,
   FileSpreadsheet,
   Trash2,
   ShoppingCart,
   X,
+  Search,
+  Check,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -21,6 +24,7 @@ import {
 
 interface DetalleItem {
   material_id: string | null;
+  codigo_item: string;
   descripcion_item: string;
   cantidad: number;
   unidad: string;
@@ -59,12 +63,99 @@ const ESTADOS: OrdenCompra['estado'][] = ['pendiente', 'aprobada', 'recibida', '
 function blankItem(): DetalleItem {
   return {
     material_id: null,
+    codigo_item: '',
     descripcion_item: '',
     cantidad: 1,
     unidad: 'pza',
     precio_unitario: 0,
     subtotal: 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Autocomplete component
+// ---------------------------------------------------------------------------
+
+function AutocompleteInput({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className = '',
+}: {
+  value: string;
+  onChange: (val: string, option?: { id: string; label: string; extra?: Record<string, string | number | null> }) => void;
+  options: { id: string; label: string; extra?: Record<string, string | number | null> }[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes((search || value).toLowerCase())
+  );
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        type="text"
+        value={open ? search : value}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          onChange(e.target.value);
+          if (!open) setOpen(true);
+        }}
+        onFocus={() => {
+          setSearch(value);
+          setOpen(true);
+        }}
+        placeholder={placeholder}
+        className={className}
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          {filtered.slice(0, 20).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+              onClick={() => {
+                onChange(opt.label, opt);
+                setSearch(opt.label);
+                setOpen(false);
+              }}
+            >
+              <span className="truncate">{opt.label}</span>
+              {opt.extra?.codigo && (
+                <span className="ml-auto shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500">
+                  {String(opt.extra.codigo)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Folio generator
+// ---------------------------------------------------------------------------
+
+function generateFolio(num: number): string {
+  const yr = new Date().getFullYear().toString().slice(-2);
+  return `RO-${String(num).padStart(3, '0')}-${yr}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,6 +171,7 @@ export default function OrdenesPage() {
 
   // --- filters ---
   const [filtroEstado, setFiltroEstado] = useState<EstadoFilter>('todos');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // --- modals ---
   const [showForm, setShowForm] = useState(false);
@@ -89,14 +181,17 @@ export default function OrdenesPage() {
   // --- form state ---
   const [editingOrden, setEditingOrden] = useState<OrdenCompra | null>(null);
   const [formProveedorId, setFormProveedorId] = useState('');
+  const [formProveedorSearch, setFormProveedorSearch] = useState('');
   const [formFecha, setFormFecha] = useState('');
   const [formFechaEntrega, setFormFechaEntrega] = useState('');
+  const [formObraProyecto, setFormObraProyecto] = useState('');
+  const [formVendedor, setFormVendedor] = useState('');
   const [formNotas, setFormNotas] = useState('');
   const [formItems, setFormItems] = useState<DetalleItem[]>([blankItem()]);
   const [saving, setSaving] = useState(false);
 
   // --- detail ---
-  const [detailOrden, setDetailOrden] = useState<OrdenCompra | null>(null);
+  const [detailOrden, setDetailOrden] = useState<(OrdenCompra & { proveedores?: Proveedor }) | null>(null);
   const [detailItems, setDetailItems] = useState<OrdenDetalle[]>([]);
 
   // --- estado change ---
@@ -160,23 +255,71 @@ export default function OrdenesPage() {
   // Filtered ordenes
   // ---------------------------------------------------------------------------
 
-  const ordenesFiltradas =
-    filtroEstado === 'todos'
-      ? ordenes
-      : ordenes.filter((o) => o.estado === filtroEstado);
+  const ordenesFiltradas = ordenes.filter((o) => {
+    if (filtroEstado !== 'todos' && o.estado !== filtroEstado) return false;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      return (
+        o.numero_orden.toLowerCase().includes(term) ||
+        (o.proveedores?.nombre ?? '').toLowerCase().includes(term) ||
+        (o.obra_proyecto ?? '').toLowerCase().includes(term)
+      );
+    }
+    return true;
+  });
 
   // ---------------------------------------------------------------------------
   // Form helpers
   // ---------------------------------------------------------------------------
 
-  function openCreateForm() {
+  async function openCreateForm() {
     setEditingOrden(null);
     setFormProveedorId('');
+    setFormProveedorSearch('');
     setFormFecha(new Date().toISOString().slice(0, 10));
     setFormFechaEntrega('');
+    setFormObraProyecto('');
+    setFormVendedor('');
     setFormNotas('');
     setFormItems([blankItem()]);
     setShowForm(true);
+  }
+
+  async function openEditForm(orden: OrdenCompra & { proveedores?: Proveedor }) {
+    setEditingOrden(orden);
+    setFormProveedorId(orden.proveedor_id || '');
+    setFormProveedorSearch(orden.proveedores?.nombre || '');
+    setFormFecha(orden.fecha);
+    setFormFechaEntrega(orden.fecha_entrega || '');
+    setFormObraProyecto(orden.obra_proyecto || '');
+    setFormVendedor(orden.vendedor || '');
+    setFormNotas(orden.notas || '');
+
+    const { data: items } = await supabase
+      .from('orden_detalle')
+      .select('*')
+      .eq('orden_id', orden.id)
+      .order('created_at');
+
+    setFormItems(
+      items && items.length > 0
+        ? items.map((i) => ({
+            material_id: i.material_id,
+            codigo_item: i.codigo_item || '',
+            descripcion_item: i.descripcion_item,
+            cantidad: i.cantidad,
+            unidad: i.unidad,
+            precio_unitario: i.precio_unitario,
+            subtotal: i.subtotal,
+          }))
+        : [blankItem()]
+    );
+    setShowForm(true);
+  }
+
+  function selectProveedor(prov: Proveedor) {
+    setFormProveedorId(prov.id);
+    setFormProveedorSearch(prov.nombre);
   }
 
   function updateItem(index: number, field: keyof DetalleItem, value: string | number | null) {
@@ -184,17 +327,16 @@ export default function OrdenesPage() {
       const next = [...prev];
       const item = { ...next[index], [field]: value };
 
-      // auto-fill from material
       if (field === 'material_id' && value) {
         const mat = materiales.find((m) => m.id === value);
         if (mat) {
           item.descripcion_item = mat.nombre;
           item.unidad = mat.unidad;
           item.precio_unitario = mat.precio_unitario;
+          item.codigo_item = mat.codigo || '';
         }
       }
 
-      // recalc subtotal
       item.subtotal = item.cantidad * item.precio_unitario;
       next[index] = item;
       return next;
@@ -214,7 +356,7 @@ export default function OrdenesPage() {
   const formTotal = formSubtotal + formIva;
 
   // ---------------------------------------------------------------------------
-  // Save order
+  // Save order (create or update)
   // ---------------------------------------------------------------------------
 
   async function handleSaveOrder() {
@@ -229,55 +371,105 @@ export default function OrdenesPage() {
 
     setSaving(true);
 
-    const numero_orden = 'OC-' + Date.now();
+    if (editingOrden) {
+      // --- UPDATE ---
+      const { error: orderError } = await supabase
+        .from('ordenes_compra')
+        .update({
+          proveedor_id: formProveedorId,
+          fecha: formFecha,
+          fecha_entrega: formFechaEntrega || null,
+          obra_proyecto: formObraProyecto || null,
+          vendedor: formVendedor || null,
+          subtotal: formSubtotal,
+          iva: formIva,
+          total: formTotal,
+          notas: formNotas || null,
+        })
+        .eq('id', editingOrden.id);
 
-    const orderPayload = {
-      numero_orden,
-      proveedor_id: formProveedorId,
-      fecha: formFecha,
-      fecha_entrega: formFechaEntrega || null,
-      estado: 'pendiente' as const,
-      subtotal: formSubtotal,
-      iva: formIva,
-      total: formTotal,
-      notas: formNotas || null,
-    };
-
-    const { data: insertedOrder, error: orderError } = await supabase
-      .from('ordenes_compra')
-      .insert(orderPayload)
-      .select()
-      .single();
-
-    if (orderError || !insertedOrder) {
-      addToast('Error al crear la orden: ' + (orderError?.message ?? 'desconocido'), 'error');
-      setSaving(false);
-      return;
-    }
-
-    const detailRows = formItems
-      .filter((i) => i.descripcion_item)
-      .map((i) => ({
-        orden_id: insertedOrder.id,
-        material_id: i.material_id || null,
-        descripcion_item: i.descripcion_item,
-        cantidad: i.cantidad,
-        unidad: i.unidad,
-        precio_unitario: i.precio_unitario,
-        subtotal: i.cantidad * i.precio_unitario,
-      }));
-
-    if (detailRows.length > 0) {
-      const { error: detailError } = await supabase
-        .from('orden_detalle')
-        .insert(detailRows);
-
-      if (detailError) {
-        addToast('Orden creada pero error en detalle: ' + detailError.message, 'error');
+      if (orderError) {
+        addToast('Error al actualizar: ' + orderError.message, 'error');
+        setSaving(false);
+        return;
       }
+
+      await supabase.from('orden_detalle').delete().eq('orden_id', editingOrden.id);
+
+      const detailRows = formItems
+        .filter((i) => i.descripcion_item)
+        .map((i) => ({
+          orden_id: editingOrden.id,
+          material_id: i.material_id || null,
+          codigo_item: i.codigo_item || null,
+          descripcion_item: i.descripcion_item,
+          cantidad: i.cantidad,
+          unidad: i.unidad,
+          precio_unitario: i.precio_unitario,
+          subtotal: i.cantidad * i.precio_unitario,
+        }));
+
+      if (detailRows.length > 0) {
+        await supabase.from('orden_detalle').insert(detailRows);
+      }
+
+      addToast('Orden ' + editingOrden.numero_orden + ' actualizada correctamente');
+    } else {
+      // --- CREATE ---
+      const { data: seqData } = await supabase.rpc('nextval', { seq_name: 'ordenes_folio_seq' }).single();
+      const folioNum = typeof seqData === 'number' ? seqData : 1;
+      const numero_orden = generateFolio(folioNum);
+
+      const orderPayload = {
+        numero_orden,
+        proveedor_id: formProveedorId,
+        fecha: formFecha,
+        fecha_entrega: formFechaEntrega || null,
+        estado: 'pendiente' as const,
+        obra_proyecto: formObraProyecto || null,
+        vendedor: formVendedor || null,
+        folio_numero: folioNum,
+        subtotal: formSubtotal,
+        iva: formIva,
+        total: formTotal,
+        notas: formNotas || null,
+      };
+
+      const { data: insertedOrder, error: orderError } = await supabase
+        .from('ordenes_compra')
+        .insert(orderPayload)
+        .select()
+        .single();
+
+      if (orderError || !insertedOrder) {
+        addToast('Error al crear la orden: ' + (orderError?.message ?? 'desconocido'), 'error');
+        setSaving(false);
+        return;
+      }
+
+      const detailRows = formItems
+        .filter((i) => i.descripcion_item)
+        .map((i) => ({
+          orden_id: insertedOrder.id,
+          material_id: i.material_id || null,
+          codigo_item: i.codigo_item || null,
+          descripcion_item: i.descripcion_item,
+          cantidad: i.cantidad,
+          unidad: i.unidad,
+          precio_unitario: i.precio_unitario,
+          subtotal: i.cantidad * i.precio_unitario,
+        }));
+
+      if (detailRows.length > 0) {
+        const { error: detailError } = await supabase.from('orden_detalle').insert(detailRows);
+        if (detailError) {
+          addToast('Orden creada pero error en detalle: ' + detailError.message, 'error');
+        }
+      }
+
+      addToast('Orden ' + numero_orden + ' creada correctamente');
     }
 
-    addToast('Orden ' + numero_orden + ' creada correctamente');
     setSaving(false);
     setShowForm(false);
     fetchOrdenes();
@@ -290,7 +482,6 @@ export default function OrdenesPage() {
   async function handleDelete(orden: OrdenCompra) {
     if (!confirm('¿Eliminar la orden ' + orden.numero_orden + '? Esta acción no se puede deshacer.')) return;
 
-    // delete detail first (FK)
     await supabase.from('orden_detalle').delete().eq('orden_id', orden.id);
     const { error } = await supabase.from('ordenes_compra').delete().eq('id', orden.id);
 
@@ -332,7 +523,7 @@ export default function OrdenesPage() {
   // View detail
   // ---------------------------------------------------------------------------
 
-  async function openDetail(orden: OrdenCompra) {
+  async function openDetail(orden: OrdenCompra & { proveedores?: Proveedor }) {
     setDetailOrden(orden);
     const { data } = await supabase
       .from('orden_detalle')
@@ -344,70 +535,63 @@ export default function OrdenesPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Exports
+  // Build export data
   // ---------------------------------------------------------------------------
 
-  async function handleExportPDF(orden: OrdenCompra & { proveedores?: Proveedor }) {
+  async function buildExportData(orden: OrdenCompra & { proveedores?: Proveedor }): Promise<OCExportData> {
     const { data: items } = await supabase
       .from('orden_detalle')
       .select('*')
       .eq('orden_id', orden.id)
       .order('created_at');
 
-    const proveedor = orden.proveedores;
-    exportOrdenCompraPDF({
-      numero_orden: orden.numero_orden,
-      fecha: formatDate(orden.fecha),
-      fecha_entrega: orden.fecha_entrega ? formatDate(orden.fecha_entrega) : null,
-      proveedor: proveedor?.nombre ?? 'Sin proveedor',
-      contacto: proveedor?.contacto ?? undefined,
-      telefono: proveedor?.telefono ?? undefined,
-      notas: orden.notas,
+    const prov = orden.proveedores;
+    return {
+      folio: orden.numero_orden,
+      obra_proyecto: orden.obra_proyecto || '',
+      fecha: formatDateShort(orden.fecha),
+      proveedor_nombre: prov?.nombre ?? 'Sin proveedor',
+      proveedor_rfc: prov?.rfc ?? '',
+      proveedor_telefono: prov?.telefono ?? '',
+      proveedor_email: prov?.email ?? '',
+      vendedor: orden.vendedor || '',
+      fecha_entrega: orden.fecha_entrega ? formatDateShort(orden.fecha_entrega) : '',
       items: (items ?? []).map((i) => ({
+        codigo: i.codigo_item || '',
         descripcion: i.descripcion_item,
-        cantidad: i.cantidad,
         unidad: i.unidad,
+        cantidad: i.cantidad,
         precio_unitario: i.precio_unitario,
-        subtotal: i.subtotal,
+        importe: i.subtotal,
       })),
       subtotal: orden.subtotal,
       iva: orden.iva,
       total: orden.total,
-    });
-    addToast('PDF generado');
+      notas: orden.notas,
+    };
   }
 
   async function handleExportExcel(orden: OrdenCompra & { proveedores?: Proveedor }) {
-    const { data: items } = await supabase
-      .from('orden_detalle')
-      .select('*')
-      .eq('orden_id', orden.id)
-      .order('created_at');
-
-    const rows = (items ?? []).map((i, idx) => ({
-      num: idx + 1,
-      descripcion: i.descripcion_item,
-      cantidad: i.cantidad,
-      unidad: i.unidad,
-      precio_unitario: i.precio_unitario,
-      subtotal: i.subtotal,
-    }));
-
-    exportToExcel(
-      rows as unknown as Record<string, unknown>[],
-      [
-        { key: 'num', label: '#' },
-        { key: 'descripcion', label: 'Descripción' },
-        { key: 'cantidad', label: 'Cantidad' },
-        { key: 'unidad', label: 'Unidad' },
-        { key: 'precio_unitario', label: 'P. Unitario' },
-        { key: 'subtotal', label: 'Subtotal' },
-      ],
-      `Orden_${orden.numero_orden}`,
-      'Detalle'
-    );
-    addToast('Excel generado');
+    const data = await buildExportData(orden);
+    exportOCExcel(data);
+    addToast('Excel generado con formato OC');
   }
+
+  async function handleExportPDF(orden: OrdenCompra & { proveedores?: Proveedor }) {
+    const data = await buildExportData(orden);
+    exportOCPDF(data);
+    addToast('PDF generado');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Material options for autocomplete
+  // ---------------------------------------------------------------------------
+
+  const materialOptions = materiales.map((m) => ({
+    id: m.id,
+    label: m.nombre,
+    extra: { codigo: m.codigo, precio: m.precio_unitario, unidad: m.unidad } as Record<string, string | number | null>,
+  }));
 
   // ---------------------------------------------------------------------------
   // Render
@@ -420,7 +604,7 @@ export default function OrdenesPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`animate-slide-in flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all ${
+            className={`animate-slide-in flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
               t.type === 'success' ? 'bg-green-600' : 'bg-red-600'
             }`}
           >
@@ -442,36 +626,44 @@ export default function OrdenesPage() {
             <ShoppingCart className="text-white" size={22} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Órdenes de Compra</h1>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Órdenes de Compra</h1>
             <p className="text-sm text-gray-500">
               {ordenesFiltradas.length} orden{ordenesFiltradas.length !== 1 ? 'es' : ''}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Filter */}
-          <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value as EstadoFilter)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
-          >
-            <option value="todos">Todos los estados</option>
-            {ESTADOS.map((e) => (
-              <option key={e} value={e}>
-                {ESTADO_LABELS[e]}
-              </option>
-            ))}
-          </select>
+        <button
+          onClick={openCreateForm}
+          className="btn-primary flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
+        >
+          <Plus size={18} />
+          Nueva Orden
+        </button>
+      </div>
 
-          <button
-            onClick={openCreateForm}
-            className="flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
-          >
-            <Plus size={18} />
-            Nueva Orden
-          </button>
+      {/* Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por folio, proveedor u obra..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 py-2.5 pl-9 pr-3 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+          />
         </div>
+        <select
+          value={filtroEstado}
+          onChange={(e) => setFiltroEstado(e.target.value as EstadoFilter)}
+          className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+        >
+          <option value="todos">Todos los estados</option>
+          {ESTADOS.map((e) => (
+            <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
+          ))}
+        </select>
       </div>
 
       {/* Mobile Card View */}
@@ -485,10 +677,13 @@ export default function OrdenesPage() {
         ) : (
           ordenesFiltradas.map((orden) => (
             <div key={orden.id} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
-              <div className="mb-3 flex items-start justify-between">
+              <div className="mb-2 flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold text-[#1a365d]">{orden.numero_orden}</p>
                   <p className="mt-0.5 text-xs text-gray-500">{orden.proveedores?.nombre ?? 'Sin proveedor'}</p>
+                  {orden.obra_proyecto && (
+                    <p className="mt-0.5 text-xs text-gray-400">{orden.obra_proyecto}</p>
+                  )}
                 </div>
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[orden.estado]}`}>
                   {ESTADO_LABELS[orden.estado]}
@@ -498,21 +693,21 @@ export default function OrdenesPage() {
                 <span className="text-gray-500">{formatDate(orden.fecha)}</span>
                 <span className="font-bold text-gray-900">{formatCurrency(orden.total)}</span>
               </div>
-              <div className="flex items-center gap-1 border-t border-gray-100 pt-3">
-                <button onClick={() => openDetail(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
-                  <Eye size={14} className="mx-auto mb-0.5" />Ver
+              <div className="grid grid-cols-5 gap-1 border-t border-gray-100 pt-3">
+                <button onClick={() => openDetail(orden)} className="flex flex-col items-center rounded-lg py-2 text-xs font-medium text-gray-600 active:bg-gray-50">
+                  <Eye size={16} className="mb-0.5" />Ver
                 </button>
-                <button onClick={() => openEstadoModal(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
-                  <ShoppingCart size={14} className="mx-auto mb-0.5" />Estado
+                <button onClick={() => openEditForm(orden)} className="flex flex-col items-center rounded-lg py-2 text-xs font-medium text-gray-600 active:bg-gray-50">
+                  <Edit2 size={16} className="mb-0.5" />Editar
                 </button>
-                <button onClick={() => handleExportPDF(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
-                  <FileText size={14} className="mx-auto mb-0.5" />PDF
+                <button onClick={() => handleExportPDF(orden)} className="flex flex-col items-center rounded-lg py-2 text-xs font-medium text-gray-600 active:bg-gray-50">
+                  <FileText size={16} className="mb-0.5" />PDF
                 </button>
-                <button onClick={() => handleExportExcel(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-gray-700 transition-colors active:bg-gray-100">
-                  <FileSpreadsheet size={14} className="mx-auto mb-0.5" />Excel
+                <button onClick={() => handleExportExcel(orden)} className="flex flex-col items-center rounded-lg py-2 text-xs font-medium text-gray-600 active:bg-gray-50">
+                  <FileSpreadsheet size={16} className="mb-0.5" />Excel
                 </button>
-                <button onClick={() => handleDelete(orden)} className="flex-1 rounded-lg bg-gray-50 py-2 text-center text-xs font-medium text-red-600 transition-colors active:bg-red-50">
-                  <Trash2 size={14} className="mx-auto mb-0.5" />Borrar
+                <button onClick={() => handleDelete(orden)} className="flex flex-col items-center rounded-lg py-2 text-xs font-medium text-red-500 active:bg-red-50">
+                  <Trash2 size={16} className="mb-0.5" />Borrar
                 </button>
               </div>
             </div>
@@ -526,8 +721,9 @@ export default function OrdenesPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-4 py-3 font-semibold text-gray-700"># Orden</th>
+                <th className="px-4 py-3 font-semibold text-gray-700">Folio</th>
                 <th className="px-4 py-3 font-semibold text-gray-700">Proveedor</th>
+                <th className="px-4 py-3 font-semibold text-gray-700">Obra / Proyecto</th>
                 <th className="px-4 py-3 font-semibold text-gray-700">Fecha</th>
                 <th className="px-4 py-3 font-semibold text-gray-700">Estado</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Total</th>
@@ -536,70 +732,40 @@ export default function OrdenesPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
-                    Cargando...
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">Cargando...</td></tr>
               ) : ordenesFiltradas.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
-                    No se encontraron órdenes
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No se encontraron órdenes</td></tr>
               ) : (
                 ordenesFiltradas.map((orden) => (
                   <tr key={orden.id} className="transition-colors hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-[#1a365d]">{orden.numero_orden}</td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {orden.proveedores?.nombre ?? 'Sin proveedor'}
-                    </td>
+                    <td className="px-4 py-3 text-gray-700">{orden.proveedores?.nombre ?? 'Sin proveedor'}</td>
+                    <td className="px-4 py-3 text-gray-600">{orden.obra_proyecto || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(orden.fecha)}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[orden.estado]}`}
+                      <button
+                        onClick={() => openEstadoModal(orden)}
+                        className={`inline-block cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${ESTADO_COLORS[orden.estado]}`}
                       >
                         {ESTADO_LABELS[orden.estado]}
-                      </span>
+                      </button>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">
-                      {formatCurrency(orden.total)}
-                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">{formatCurrency(orden.total)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => openDetail(orden)}
-                          title="Ver detalle"
-                          className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                        >
+                        <button onClick={() => openDetail(orden)} title="Ver detalle" className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600">
                           <Eye size={16} />
                         </button>
-                        <button
-                          onClick={() => openEstadoModal(orden)}
-                          title="Cambiar estado"
-                          className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-yellow-50 hover:text-yellow-600"
-                        >
-                          <ShoppingCart size={16} />
+                        <button onClick={() => openEditForm(orden)} title="Editar" className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-yellow-50 hover:text-yellow-600">
+                          <Edit2 size={16} />
                         </button>
-                        <button
-                          onClick={() => handleExportPDF(orden)}
-                          title="Exportar PDF"
-                          className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                        >
+                        <button onClick={() => handleExportPDF(orden)} title="Exportar PDF" className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600">
                           <FileText size={16} />
                         </button>
-                        <button
-                          onClick={() => handleExportExcel(orden)}
-                          title="Exportar Excel"
-                          className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600"
-                        >
+                        <button onClick={() => handleExportExcel(orden)} title="Exportar Excel" className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600">
                           <FileSpreadsheet size={16} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(orden)}
-                          title="Eliminar"
-                          className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                        >
+                        <button onClick={() => handleDelete(orden)} title="Eliminar" className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -613,29 +779,30 @@ export default function OrdenesPage() {
       </div>
 
       {/* ================================================================= */}
-      {/* CREATE ORDER MODAL                                                */}
+      {/* CREATE / EDIT ORDER MODAL                                         */}
       {/* ================================================================= */}
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Nueva Orden de Compra" size="xl">
-        <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
-          {/* Proveedor & dates */}
+      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editingOrden ? `Editar ${editingOrden.numero_orden}` : 'Nueva Orden de Compra'} size="xl">
+        <div className="space-y-5">
+          {/* Company header (read-only) */}
+          <div className="rounded-lg bg-[#1a365d]/5 p-3">
+            <p className="text-sm font-bold text-[#1a365d]">MARTIN ARMANDO ROJAS PACHECO</p>
+            <p className="text-xs text-gray-500">RFC: ROPM6310199LA | compras@acabadosro.com</p>
+          </div>
+
+          {/* Obra/Proyecto & Dates */}
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Proveedor *</label>
-              <select
-                value={formProveedorId}
-                onChange={(e) => setFormProveedorId(e.target.value)}
+              <label className="mb-1 block text-sm font-medium text-gray-700">Obra / Proyecto</label>
+              <input
+                type="text"
+                value={formObraProyecto}
+                onChange={(e) => setFormObraProyecto(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
-              >
-                <option value="">Seleccionar...</option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+                placeholder="Ej: HOTEL TRU"
+              />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Fecha Emisión *</label>
               <input
                 type="date"
                 value={formFecha}
@@ -650,6 +817,53 @@ export default function OrdenesPage() {
                 value={formFechaEntrega}
                 onChange={(e) => setFormFechaEntrega(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              />
+            </div>
+          </div>
+
+          {/* Proveedor & Vendedor */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Proveedor *</label>
+              <AutocompleteInput
+                value={formProveedorSearch}
+                onChange={(val, opt) => {
+                  setFormProveedorSearch(val);
+                  if (opt) {
+                    const prov = proveedores.find((p) => p.id === opt.id);
+                    if (prov) selectProveedor(prov);
+                  } else {
+                    setFormProveedorId('');
+                  }
+                }}
+                options={proveedores.map((p) => ({
+                  id: p.id,
+                  label: p.nombre,
+                  extra: { rfc: p.rfc, telefono: p.telefono } as Record<string, string | number | null>,
+                }))}
+                placeholder="Buscar proveedor..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              />
+              {formProveedorId && (() => {
+                const prov = proveedores.find((p) => p.id === formProveedorId);
+                if (!prov) return null;
+                return (
+                  <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-xs text-green-700">
+                    <Check size={12} />
+                    <span>{prov.nombre}</span>
+                    {prov.rfc && <span className="font-mono text-green-600">({prov.rfc})</span>}
+                  </div>
+                );
+              })()}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Vendedor</label>
+              <input
+                type="text"
+                value={formVendedor}
+                onChange={(e) => setFormVendedor(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+                placeholder="Nombre del vendedor"
               />
             </div>
           </div>
@@ -676,105 +890,98 @@ export default function OrdenesPage() {
                 className="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200"
               >
                 <Plus size={14} />
-                Agregar Item
+                Agregar
               </button>
             </div>
 
             <div className="space-y-3">
               {formItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-12 items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
-                >
-                  {/* Material dropdown */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="mb-1 block text-xs text-gray-500">Material</label>
-                    <select
-                      value={item.material_id ?? ''}
-                      onChange={(e) =>
-                        updateItem(idx, 'material_id', e.target.value || null)
-                      }
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
-                    >
-                      <option value="">Personalizado</option>
-                      {materiales.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Description */}
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="mb-1 block text-xs text-gray-500">Descripción</label>
-                    <input
-                      type="text"
-                      value={item.descripcion_item}
-                      onChange={(e) => updateItem(idx, 'descripcion_item', e.target.value)}
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
-                      placeholder="Descripción del item"
-                    />
-                  </div>
-
-                  {/* Cantidad */}
-                  <div className="col-span-4 sm:col-span-1">
-                    <label className="mb-1 block text-xs text-gray-500">Cant.</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={item.cantidad}
-                      onChange={(e) => updateItem(idx, 'cantidad', parseFloat(e.target.value) || 0)}
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Unidad */}
-                  <div className="col-span-4 sm:col-span-1">
-                    <label className="mb-1 block text-xs text-gray-500">Unidad</label>
-                    <input
-                      type="text"
-                      value={item.unidad}
-                      onChange={(e) => updateItem(idx, 'unidad', e.target.value)}
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Precio unitario */}
-                  <div className="col-span-4 sm:col-span-2">
-                    <label className="mb-1 block text-xs text-gray-500">P. Unitario</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={item.precio_unitario}
-                      onChange={(e) =>
-                        updateItem(idx, 'precio_unitario', parseFloat(e.target.value) || 0)
-                      }
-                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Subtotal (read-only) */}
-                  <div className="col-span-10 sm:col-span-1">
-                    <label className="mb-1 block text-xs text-gray-500">Subtotal</label>
-                    <div className="rounded bg-white px-2 py-1.5 text-sm font-medium text-gray-700">
-                      {formatCurrency(item.cantidad * item.precio_unitario)}
+                <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  {/* Row 1: Material selector + Code */}
+                  <div className="mb-2 grid grid-cols-12 gap-2">
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="mb-1 block text-xs text-gray-500">Material</label>
+                      <select
+                        value={item.material_id ?? ''}
+                        onChange={(e) => updateItem(idx, 'material_id', e.target.value || null)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
+                      >
+                        <option value="">Personalizado</option>
+                        {materiales.map((m) => (
+                          <option key={m.id} value={m.id}>{m.codigo ? `${m.codigo} - ` : ''}{m.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-6 sm:col-span-2">
+                      <label className="mb-1 block text-xs text-gray-500">Código SKU</label>
+                      <input
+                        type="text"
+                        value={item.codigo_item}
+                        onChange={(e) => updateItem(idx, 'codigo_item', e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-sm focus:border-[#1a365d] focus:outline-none"
+                        placeholder="SKU"
+                      />
+                    </div>
+                    <div className="col-span-6 sm:col-span-6">
+                      <label className="mb-1 block text-xs text-gray-500">Descripción</label>
+                      <input
+                        type="text"
+                        value={item.descripcion_item}
+                        onChange={(e) => updateItem(idx, 'descripcion_item', e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
+                        placeholder="Descripción del item"
+                      />
                     </div>
                   </div>
-
-                  {/* Remove */}
-                  <div className="col-span-2 flex justify-end sm:col-span-1">
-                    <button
-                      type="button"
-                      onClick={() => removeItemRow(idx)}
-                      disabled={formItems.length === 1}
-                      className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
-                      title="Eliminar item"
-                    >
-                      <X size={16} />
-                    </button>
+                  {/* Row 2: Qty, Unit, Price, Subtotal, Remove */}
+                  <div className="grid grid-cols-12 items-end gap-2">
+                    <div className="col-span-3 sm:col-span-2">
+                      <label className="mb-1 block text-xs text-gray-500">Cant.</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={item.cantidad}
+                        onChange={(e) => updateItem(idx, 'cantidad', parseFloat(e.target.value) || 0)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-3 sm:col-span-2">
+                      <label className="mb-1 block text-xs text-gray-500">Unidad</label>
+                      <input
+                        type="text"
+                        value={item.unidad}
+                        onChange={(e) => updateItem(idx, 'unidad', e.target.value)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-4 sm:col-span-3">
+                      <label className="mb-1 block text-xs text-gray-500">P. Unitario</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={item.precio_unitario}
+                        onChange={(e) => updateItem(idx, 'precio_unitario', parseFloat(e.target.value) || 0)}
+                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-4 sm:col-span-3">
+                      <label className="mb-1 block text-xs text-gray-500">Importe</label>
+                      <div className="rounded bg-white px-2 py-1.5 text-sm font-semibold text-[#1a365d]">
+                        {formatCurrency(item.cantidad * item.precio_unitario)}
+                      </div>
+                    </div>
+                    <div className="col-span-4 flex justify-end sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => removeItemRow(idx)}
+                        disabled={formItems.length === 1}
+                        className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -792,7 +999,7 @@ export default function OrdenesPage() {
                 <span>IVA (16%)</span>
                 <span>{formatCurrency(formIva)}</span>
               </div>
-              <div className="flex justify-between border-t border-gray-300 pt-1 text-base font-bold text-gray-900">
+              <div className="flex justify-between border-t border-gray-300 pt-1 text-base font-bold text-[#1a365d]">
                 <span>Total</span>
                 <span>{formatCurrency(formTotal)}</span>
               </div>
@@ -800,11 +1007,11 @@ export default function OrdenesPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
             >
               Cancelar
             </button>
@@ -812,9 +1019,9 @@ export default function OrdenesPage() {
               type="button"
               onClick={handleSaveOrder}
               disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+              className="btn-primary flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : 'Guardar Orden'}
+              {saving ? 'Guardando...' : editingOrden ? 'Actualizar Orden' : 'Guardar Orden'}
             </button>
           </div>
         </div>
@@ -830,39 +1037,46 @@ export default function OrdenesPage() {
         size="xl"
       >
         {detailOrden && (
-          <div className="max-h-[75vh] space-y-4 overflow-y-auto pr-1">
-            {/* Header info */}
+          <div className="space-y-4">
+            {/* Company header */}
+            <div className="rounded-lg bg-[#1a365d]/5 p-3">
+              <p className="text-sm font-bold text-[#1a365d]">MARTIN ARMANDO ROJAS PACHECO</p>
+              <p className="text-xs text-gray-500">RFC: ROPM6310199LA | compras@acabadosro.com</p>
+            </div>
+
+            {/* Order + Supplier info */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 text-sm">
-                <p>
-                  <span className="font-semibold text-gray-700">Proveedor: </span>
-                  {detailOrden.proveedores?.nombre ?? 'Sin proveedor'}
-                </p>
-                <p>
-                  <span className="font-semibold text-gray-700">Fecha: </span>
-                  {formatDate(detailOrden.fecha)}
-                </p>
-                {detailOrden.fecha_entrega && (
-                  <p>
-                    <span className="font-semibold text-gray-700">Fecha Entrega: </span>
-                    {formatDate(detailOrden.fecha_entrega)}
-                  </p>
+              <div className="space-y-1.5 text-sm">
+                <p><span className="font-semibold text-gray-700">Proveedor: </span>{detailOrden.proveedores?.nombre ?? 'Sin proveedor'}</p>
+                {detailOrden.proveedores?.rfc && (
+                  <p><span className="font-semibold text-gray-700">RFC: </span><span className="font-mono">{detailOrden.proveedores.rfc}</span></p>
+                )}
+                {detailOrden.proveedores?.telefono && (
+                  <p><span className="font-semibold text-gray-700">Tel: </span>{detailOrden.proveedores.telefono}</p>
+                )}
+                {detailOrden.proveedores?.email && (
+                  <p><span className="font-semibold text-gray-700">Correo: </span>{detailOrden.proveedores.email}</p>
                 )}
               </div>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-1.5 text-sm">
+                {detailOrden.obra_proyecto && (
+                  <p><span className="font-semibold text-gray-700">Obra: </span>{detailOrden.obra_proyecto}</p>
+                )}
+                <p><span className="font-semibold text-gray-700">Fecha: </span>{formatDate(detailOrden.fecha)}</p>
+                {detailOrden.fecha_entrega && (
+                  <p><span className="font-semibold text-gray-700">Entrega: </span>{formatDate(detailOrden.fecha_entrega)}</p>
+                )}
+                {detailOrden.vendedor && (
+                  <p><span className="font-semibold text-gray-700">Vendedor: </span>{detailOrden.vendedor}</p>
+                )}
                 <p>
                   <span className="font-semibold text-gray-700">Estado: </span>
-                  <span
-                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[detailOrden.estado]}`}
-                  >
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[detailOrden.estado]}`}>
                     {ESTADO_LABELS[detailOrden.estado]}
                   </span>
                 </p>
                 {detailOrden.notas && (
-                  <p>
-                    <span className="font-semibold text-gray-700">Notas: </span>
-                    {detailOrden.notas}
-                  </p>
+                  <p><span className="font-semibold text-gray-700">Notas: </span>{detailOrden.notas}</p>
                 )}
               </div>
             </div>
@@ -875,9 +1089,10 @@ export default function OrdenesPage() {
                 detailItems.map((item, idx) => (
                   <div key={item.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <div className="mb-1 flex items-start justify-between">
-                      <p className="text-sm font-medium text-gray-900">
-                        {idx + 1}. {item.descripcion_item}
-                      </p>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{idx + 1}. {item.descripcion_item}</p>
+                        {item.codigo_item && <p className="font-mono text-xs text-gray-400">{item.codigo_item}</p>}
+                      </div>
                       <p className="text-sm font-bold text-gray-900">{formatCurrency(item.subtotal)}</p>
                     </div>
                     <div className="flex gap-4 text-xs text-gray-500">
@@ -895,34 +1110,28 @@ export default function OrdenesPage() {
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="px-3 py-2 font-semibold text-gray-700">#</th>
+                    <th className="px-3 py-2 font-semibold text-gray-700">Código</th>
                     <th className="px-3 py-2 font-semibold text-gray-700">Descripción</th>
-                    <th className="px-3 py-2 font-semibold text-gray-700">Cant.</th>
                     <th className="px-3 py-2 font-semibold text-gray-700">Unidad</th>
+                    <th className="px-3 py-2 font-semibold text-gray-700">Cant.</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">P. Unitario</th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Subtotal</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Importe</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {detailItems.map((item, idx) => (
                     <tr key={item.id}>
                       <td className="px-3 py-2 text-gray-500">{idx + 1}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-gray-500">{item.codigo_item || '-'}</td>
                       <td className="px-3 py-2 text-gray-700">{item.descripcion_item}</td>
-                      <td className="px-3 py-2 text-gray-700">{item.cantidad}</td>
                       <td className="px-3 py-2 text-gray-700">{item.unidad}</td>
-                      <td className="px-3 py-2 text-right text-gray-700">
-                        {formatCurrency(item.precio_unitario)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium text-gray-900">
-                        {formatCurrency(item.subtotal)}
-                      </td>
+                      <td className="px-3 py-2 text-gray-700">{item.cantidad}</td>
+                      <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(item.precio_unitario)}</td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-900">{formatCurrency(item.subtotal)}</td>
                     </tr>
                   ))}
                   {detailItems.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
-                        Sin items
-                      </td>
-                    </tr>
+                    <tr><td colSpan={7} className="px-3 py-6 text-center text-gray-400">Sin items</td></tr>
                   )}
                 </tbody>
               </table>
@@ -930,7 +1139,7 @@ export default function OrdenesPage() {
 
             {/* Totals */}
             <div className="flex justify-end">
-              <div className="w-64 space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="w-full space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:w-64">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Subtotal</span>
                   <span>{formatCurrency(detailOrden.subtotal)}</span>
@@ -939,11 +1148,29 @@ export default function OrdenesPage() {
                   <span>IVA (16%)</span>
                   <span>{formatCurrency(detailOrden.iva)}</span>
                 </div>
-                <div className="flex justify-between border-t border-gray-300 pt-1 text-base font-bold text-gray-900">
+                <div className="flex justify-between border-t border-gray-300 pt-1 text-base font-bold text-[#1a365d]">
                   <span>Total</span>
                   <span>{formatCurrency(detailOrden.total)}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Export buttons */}
+            <div className="flex flex-col gap-2 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end">
+              <button
+                onClick={() => handleExportExcel(detailOrden)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                <FileSpreadsheet size={16} />
+                Descargar Excel
+              </button>
+              <button
+                onClick={() => handleExportPDF(detailOrden)}
+                className="btn-primary flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
+              >
+                <FileText size={16} />
+                Descargar PDF
+              </button>
             </div>
           </div>
         )}
@@ -971,13 +1198,11 @@ export default function OrdenesPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
               >
                 {ESTADOS.map((e) => (
-                  <option key={e} value={e}>
-                    {ESTADO_LABELS[e]}
-                  </option>
+                  <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
                 ))}
               </select>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 onClick={() => setShowEstadoModal(false)}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
@@ -986,7 +1211,7 @@ export default function OrdenesPage() {
               </button>
               <button
                 onClick={handleChangeEstado}
-                className="rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+                className="btn-primary rounded-lg px-4 py-2 text-sm font-medium"
               >
                 Actualizar
               </button>
@@ -994,23 +1219,6 @@ export default function OrdenesPage() {
           </div>
         )}
       </Modal>
-
-      {/* Inline keyframe for toast animation */}
-      <style jsx global>{`
-        @keyframes slide-in {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
