@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OrdenCompra, OrdenDetalle, Material, Proveedor } from '@/lib/types';
 import { exportOCExcel, exportOCPDF, formatCurrency, formatDate, formatDateShort, type OCExportData } from '@/lib/export-utils';
@@ -163,6 +164,9 @@ function generateFolio(num: number): string {
 // ---------------------------------------------------------------------------
 
 export default function OrdenesPage() {
+  const params = useParams();
+  const projectId = params.id as string;
+
   // --- data ---
   const [ordenes, setOrdenes] = useState<(OrdenCompra & { proveedores?: Proveedor })[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -219,15 +223,16 @@ export default function OrdenesPage() {
     const { data, error } = await supabase
       .from('ordenes_compra')
       .select('*, proveedores(*)')
+      .eq('proyecto_id', projectId)
       .order('created_at', { ascending: false });
 
     if (error) {
-      addToast('Error al cargar órdenes: ' + error.message, 'error');
+      addToast('Error al cargar ordenes: ' + error.message, 'error');
     } else {
       setOrdenes(data ?? []);
     }
     setLoading(false);
-  }, [addToast]);
+  }, [addToast, projectId]);
 
   const fetchProveedores = useCallback(async () => {
     const { data } = await supabase
@@ -365,7 +370,7 @@ export default function OrdenesPage() {
       return;
     }
     if (formItems.every((i) => !i.descripcion_item)) {
-      addToast('Agrega al menos un item con descripción', 'error');
+      addToast('Agrega al menos un item con descripcion', 'error');
       return;
     }
 
@@ -433,6 +438,7 @@ export default function OrdenesPage() {
         iva: formIva,
         total: formTotal,
         notas: formNotas || null,
+        proyecto_id: projectId,
       };
 
       const { data: insertedOrder, error: orderError } = await supabase
@@ -480,7 +486,7 @@ export default function OrdenesPage() {
   // ---------------------------------------------------------------------------
 
   async function handleDelete(orden: OrdenCompra) {
-    if (!confirm('¿Eliminar la orden ' + orden.numero_orden + '? Esta acción no se puede deshacer.')) return;
+    if (!confirm('Eliminar la orden ' + orden.numero_orden + '? Esta accion no se puede deshacer.')) return;
 
     await supabase.from('orden_detalle').delete().eq('orden_id', orden.id);
     const { error } = await supabase.from('ordenes_compra').delete().eq('id', orden.id);
@@ -626,7 +632,7 @@ export default function OrdenesPage() {
             <ShoppingCart className="text-white" size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Órdenes de Compra</h1>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Ordenes de Compra</h1>
             <p className="text-sm text-gray-500">
               {ordenesFiltradas.length} orden{ordenesFiltradas.length !== 1 ? 'es' : ''}
             </p>
@@ -672,7 +678,7 @@ export default function OrdenesPage() {
           <div className="flex items-center justify-center py-12 text-gray-400">Cargando...</div>
         ) : ordenesFiltradas.length === 0 ? (
           <div className="flex items-center justify-center rounded-xl bg-white py-12 text-gray-400 shadow-sm ring-1 ring-gray-100">
-            No se encontraron órdenes
+            No se encontraron ordenes
           </div>
         ) : (
           ordenesFiltradas.map((orden) => (
@@ -734,7 +740,7 @@ export default function OrdenesPage() {
               {loading ? (
                 <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">Cargando...</td></tr>
               ) : ordenesFiltradas.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No se encontraron órdenes</td></tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No se encontraron ordenes</td></tr>
               ) : (
                 ordenesFiltradas.map((orden) => (
                   <tr key={orden.id} className="transition-colors hover:bg-gray-50">
@@ -802,7 +808,7 @@ export default function OrdenesPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Fecha Emisión *</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Fecha Emision *</label>
               <input
                 type="date"
                 value={formFecha}
@@ -913,7 +919,7 @@ export default function OrdenesPage() {
                       </select>
                     </div>
                     <div className="col-span-6 sm:col-span-2">
-                      <label className="mb-1 block text-xs text-gray-500">Código SKU</label>
+                      <label className="mb-1 block text-xs text-gray-500">Codigo SKU</label>
                       <input
                         type="text"
                         value={item.codigo_item}
@@ -923,13 +929,13 @@ export default function OrdenesPage() {
                       />
                     </div>
                     <div className="col-span-6 sm:col-span-6">
-                      <label className="mb-1 block text-xs text-gray-500">Descripción</label>
+                      <label className="mb-1 block text-xs text-gray-500">Descripcion</label>
                       <input
                         type="text"
                         value={item.descripcion_item}
                         onChange={(e) => updateItem(idx, 'descripcion_item', e.target.value)}
                         className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-[#1a365d] focus:outline-none"
-                        placeholder="Descripción del item"
+                        placeholder="Descripcion del item"
                       />
                     </div>
                   </div>
@@ -1110,8 +1116,8 @@ export default function OrdenesPage() {
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="px-3 py-2 font-semibold text-gray-700">#</th>
-                    <th className="px-3 py-2 font-semibold text-gray-700">Código</th>
-                    <th className="px-3 py-2 font-semibold text-gray-700">Descripción</th>
+                    <th className="px-3 py-2 font-semibold text-gray-700">Codigo</th>
+                    <th className="px-3 py-2 font-semibold text-gray-700">Descripcion</th>
                     <th className="px-3 py-2 font-semibold text-gray-700">Unidad</th>
                     <th className="px-3 py-2 font-semibold text-gray-700">Cant.</th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">P. Unitario</th>

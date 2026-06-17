@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { Plus, Edit2, Trash2, Download, DollarSign, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Gasto, TipoGasto, MESES, CATEGORIAS_GASTO } from '@/lib/types';
@@ -39,6 +40,9 @@ interface Toast {
 }
 
 export default function GastosPage() {
+  const params = useParams();
+  const projectId = params.id as string;
+
   const now = new Date();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +77,7 @@ export default function GastosPage() {
       let query = supabase
         .from('gastos')
         .select('*')
+        .eq('proyecto_id', projectId)
         .eq('mes', filterMes)
         .eq('anio', filterAnio)
         .order('fecha', { ascending: false });
@@ -90,7 +95,7 @@ export default function GastosPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterMes, filterAnio, filterCategoria, showToast]);
+  }, [filterMes, filterAnio, filterCategoria, showToast, projectId]);
 
   useEffect(() => {
     fetchGastos();
@@ -153,12 +158,12 @@ export default function GastosPage() {
   const handleSave = async () => {
     // Validation
     if (!form.categoria || !form.concepto.trim() || !form.monto || !form.fecha) {
-      showToast('Completa los campos obligatorios: categoría, concepto, monto y fecha', 'error');
+      showToast('Completa los campos obligatorios: categoria, concepto, monto y fecha', 'error');
       return;
     }
     const montoNum = parseFloat(form.monto);
     if (isNaN(montoNum) || montoNum <= 0) {
-      showToast('El monto debe ser un número positivo', 'error');
+      showToast('El monto debe ser un numero positivo', 'error');
       return;
     }
 
@@ -178,6 +183,7 @@ export default function GastosPage() {
         anio,
         proveedor: form.proveedor.trim() || null,
         notas: form.notas.trim() || null,
+        proyecto_id: projectId,
       };
 
       if (editingGasto) {
@@ -230,6 +236,7 @@ export default function GastosPage() {
       let query = supabase
         .from('gastos')
         .select('*')
+        .eq('proyecto_id', projectId)
         .eq('anio', filterAnio)
         .order('fecha', { ascending: true });
 
@@ -246,7 +253,7 @@ export default function GastosPage() {
 
       // Sheet 1: Resumen - rows per category, columns per month + total
       const resumenHeaders = [
-        { key: 'categoria', label: 'Categoría' },
+        { key: 'categoria', label: 'Categoria' },
         ...MESES.map((m, i) => ({ key: `mes_${i + 1}`, label: m })),
         { key: 'total', label: 'Total' },
       ];

@@ -18,7 +18,7 @@ export default function LoginPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        router.replace('/dashboard');
+        router.replace('/proyectos');
       } else {
         setCheckingSession(false);
       }
@@ -41,7 +41,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.replace('/dashboard');
+      router.replace('/proyectos');
     } catch {
       setError('Ocurrió un error. Intente de nuevo.');
     } finally {

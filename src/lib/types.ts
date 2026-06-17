@@ -1,3 +1,14 @@
+export interface Proyecto {
+  id: string;
+  nombre: string;
+  cliente: string | null;
+  direccion: string | null;
+  descripcion: string | null;
+  estado: 'activo' | 'completado' | 'pausado';
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface Usuario {
   id: string;
   email: string;
@@ -54,6 +65,7 @@ export interface OrdenCompra {
   obra_proyecto: string | null;
   vendedor: string | null;
   folio_numero: number | null;
+  proyecto_id: string | null;
   created_by: string | null;
   created_at: string;
   proveedores?: Proveedor;
@@ -86,6 +98,7 @@ export interface Gasto {
   proveedor: string | null;
   comprobante: string | null;
   notas: string | null;
+  proyecto_id: string | null;
   created_by: string | null;
   created_at: string;
 }

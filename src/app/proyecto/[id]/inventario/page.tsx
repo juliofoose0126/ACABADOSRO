@@ -80,7 +80,6 @@ export default function InventarioPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Factura state
   const [facturaNumero, setFacturaNumero] = useState('');
   const [facturaProveedor, setFacturaProveedor] = useState('');
   const [facturaFecha, setFacturaFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -215,7 +214,6 @@ export default function InventarioPage() {
     fetchMaterials();
   }
 
-  // --- Factura ---
   function openFacturaModal() {
     setFacturaNumero('');
     setFacturaProveedor('');
@@ -414,7 +412,6 @@ export default function InventarioPage() {
           </div>
         </div>
 
-        {/* Action buttons - stack on mobile */}
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { setFormData(emptyForm); setIsAddModalOpen(true); }}
             className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white sm:flex-none">
@@ -449,7 +446,7 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* Content: Card view mobile, Table view desktop */}
+      {/* Content */}
       {loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -556,7 +553,7 @@ export default function InventarioPage() {
         </>
       )}
 
-      {/* Add/Edit/Delete Modals */}
+      {/* Modals */}
       <Modal isOpen={isAddModalOpen} onClose={resetAndCloseModals} title="Agregar Material" size="lg">
         {renderForm(handleAdd)}
       </Modal>
@@ -622,7 +619,6 @@ export default function InventarioPage() {
               placeholder="Observaciones..." />
           </div>
 
-          {/* Items */}
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[#1a365d]">Materiales a descontar</h3>
@@ -672,7 +668,6 @@ export default function InventarioPage() {
             </div>
           </div>
 
-          {/* Total */}
           <div className="flex justify-end">
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
               <span className="text-sm text-gray-600">Total: </span>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import {
   Package,
   ShoppingCart,
@@ -22,8 +22,12 @@ interface Stats {
   lowStockCount: number;
 }
 
-export default function DashboardPage() {
+export default function ProjectDashboardPage() {
   const router = useRouter();
+  const params = useParams();
+  const projectId = params.id as string;
+  const base = `/proyecto/${projectId}`;
+
   const [userName, setUserName] = useState('');
   const [stats, setStats] = useState<Stats>({
     totalMateriales: 0,
@@ -49,8 +53,8 @@ export default function DashboardPage() {
         const [materialesRes, ordenesRes, gastosRes, proveedoresRes, lowStockRes] =
           await Promise.all([
             supabase.from('materiales').select('id', { count: 'exact', head: true }),
-            supabase.from('ordenes_compra').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente'),
-            supabase.from('gastos').select('monto').eq('mes', currentMonth).eq('anio', currentYear),
+            supabase.from('ordenes_compra').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente').eq('proyecto_id', projectId),
+            supabase.from('gastos').select('monto').eq('mes', currentMonth).eq('anio', currentYear).eq('proyecto_id', projectId),
             supabase.from('proveedores').select('id', { count: 'exact', head: true }),
             supabase.from('materiales').select('id', { count: 'exact', head: true }).lt('cantidad', 5),
           ]);
@@ -72,7 +76,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, []);
+  }, [projectId]);
 
   const statCards = [
     {
@@ -81,7 +85,7 @@ export default function DashboardPage() {
       icon: Package,
       format: 'number' as const,
       color: 'from-[#1a365d] to-[#2a4a7f]',
-      href: '/inventario',
+      href: `${base}/inventario`,
     },
     {
       label: 'Órdenes Pendientes',
@@ -89,7 +93,7 @@ export default function DashboardPage() {
       icon: ShoppingCart,
       format: 'number' as const,
       color: 'from-[#D4A520] to-[#E8B82E]',
-      href: '/ordenes',
+      href: `${base}/ordenes`,
     },
     {
       label: 'Gastos del Mes',
@@ -97,7 +101,7 @@ export default function DashboardPage() {
       icon: DollarSign,
       format: 'currency' as const,
       color: 'from-[#8B1A1A] to-[#A52222]',
-      href: '/gastos',
+      href: `${base}/gastos`,
     },
     {
       label: 'Proveedores',
@@ -105,15 +109,15 @@ export default function DashboardPage() {
       icon: Truck,
       format: 'number' as const,
       color: 'from-[#1a365d] to-[#2a4a7f]',
-      href: '/proveedores',
+      href: `${base}/proveedores`,
     },
   ];
 
   const quickActions = [
-    { label: 'Nuevo Material', href: '/inventario', icon: Package },
-    { label: 'Nueva Orden', href: '/ordenes', icon: ShoppingCart },
-    { label: 'Registrar Gasto', href: '/gastos', icon: DollarSign },
-    { label: 'Nuevo Proveedor', href: '/proveedores', icon: Truck },
+    { label: 'Nuevo Material', href: `${base}/inventario`, icon: Package },
+    { label: 'Nueva Orden', href: `${base}/ordenes`, icon: ShoppingCart },
+    { label: 'Registrar Gasto', href: `${base}/gastos`, icon: DollarSign },
+    { label: 'Nuevo Proveedor', href: `${base}/proveedores`, icon: Truck },
   ];
 
   const formatValue = (value: number, format: 'number' | 'currency') => {
@@ -197,7 +201,7 @@ export default function DashboardPage() {
       {!loading && stats.lowStockCount > 0 && (
         <div className="mb-8 animate-fade-in">
           <button
-            onClick={() => router.push('/inventario')}
+            onClick={() => router.push(`${base}/inventario`)}
             className="card-hover flex w-full items-center gap-4 rounded-xl border border-[#D4A520]/20 bg-[#D4A520]/5 p-4 text-left transition-colors hover:border-[#D4A520]/40"
           >
             <div className="rounded-lg bg-[#D4A520]/10 p-2.5">

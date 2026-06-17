@@ -258,7 +258,6 @@ export default function UsuariosPage() {
               key={usuario.id}
               className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md"
             >
-              {/* Card Header */}
               <div className="mb-4 flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div
@@ -299,7 +298,6 @@ export default function UsuariosPage() {
                 )}
               </div>
 
-              {/* Card Body */}
               <div className="space-y-2.5 text-sm text-gray-600">
                 <div className="flex items-center gap-2.5">
                   <Mail size={15} className="shrink-0 text-gray-400" />

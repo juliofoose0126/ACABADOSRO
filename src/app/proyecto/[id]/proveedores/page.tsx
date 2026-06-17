@@ -169,7 +169,6 @@ export default function ProveedoresPage() {
 
   return (
     <div className="pt-10 md:pt-0">
-      {/* Toast */}
       {toast && (
         <Toast
           message={toast.message}
@@ -257,7 +256,6 @@ export default function ProveedoresPage() {
               key={proveedor.id}
               className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md"
             >
-              {/* Card Header */}
               <div className="mb-4 flex items-start justify-between">
                 <h3 className="text-base font-bold text-[#1a365d]">
                   {proveedor.nombre}
@@ -280,7 +278,6 @@ export default function ProveedoresPage() {
                 </div>
               </div>
 
-              {/* Card Body */}
               <div className="space-y-2.5 text-sm text-gray-600">
                 {proveedor.rfc && (
                   <div className="flex items-center gap-2.5">
@@ -337,7 +334,6 @@ export default function ProveedoresPage() {
         size="lg"
       >
         <div className="space-y-4">
-          {/* Nombre */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               Nombre <span className="text-red-500">*</span>
@@ -353,7 +349,6 @@ export default function ProveedoresPage() {
             />
           </div>
 
-          {/* RFC */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               RFC
@@ -370,7 +365,6 @@ export default function ProveedoresPage() {
             />
           </div>
 
-          {/* Contacto */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               Contacto
@@ -386,7 +380,6 @@ export default function ProveedoresPage() {
             />
           </div>
 
-          {/* Telefono and Email row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -418,7 +411,6 @@ export default function ProveedoresPage() {
             </div>
           </div>
 
-          {/* Direccion */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               Direccion
@@ -434,7 +426,6 @@ export default function ProveedoresPage() {
             />
           </div>
 
-          {/* Actions */}
           <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4">
             <button
               onClick={() => {
