@@ -37,7 +37,13 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError('Credenciales incorrectas. Intente de nuevo.');
+        if (authError.message === 'Invalid login credentials') {
+          setError('Credenciales incorrectas. Verifique su correo y contraseña.');
+        } else if (authError.message === 'Email not confirmed') {
+          setError('El correo no ha sido confirmado. Revise su bandeja de entrada.');
+        } else {
+          setError(authError.message);
+        }
         return;
       }
 
