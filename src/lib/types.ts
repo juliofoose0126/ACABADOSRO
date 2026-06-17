@@ -139,3 +139,35 @@ export const CATEGORIAS_GASTO: Record<TipoGasto, string> = {
   materiales: 'Materiales',
   otros: 'Otros Gastos',
 };
+
+export type TipoDocEmpleado = 'constancia_fiscal' | 'ine' | 'comprobante_domicilio' | 'curp' | 'alta_imss' | 'baja_imss';
+
+export interface Empleado {
+  id: string;
+  nombre_completo: string;
+  puesto: string;
+  estado: 'activo' | 'baja';
+  fecha_alta: string;
+  fecha_baja: string | null;
+  proyecto_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EmpleadoDocumento {
+  id: string;
+  empleado_id: string;
+  tipo: TipoDocEmpleado;
+  nombre_archivo: string;
+  storage_path: string;
+  created_at: string;
+}
+
+export const TIPOS_DOCUMENTO: Record<TipoDocEmpleado, string> = {
+  constancia_fiscal: 'Constancia de Situación Fiscal',
+  ine: 'INE',
+  comprobante_domicilio: 'Comprobante de Domicilio',
+  curp: 'CURP',
+  alta_imss: 'Alta de IMSS',
+  baja_imss: 'Baja del IMSS',
+};

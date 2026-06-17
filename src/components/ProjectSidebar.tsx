@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Truck,
   Users,
+  HardHat,
   LogOut,
   Menu,
   X,
@@ -39,6 +40,7 @@ export default function ProjectSidebar({ projectId, projectName }: Props) {
     { href: `${base}/ordenes`, label: 'Órdenes de Compra', icon: ShoppingCart },
     { href: `${base}/ingresos`, label: 'Ingresos', icon: TrendingUp },
     { href: `${base}/gastos`, label: 'Gastos', icon: DollarSign },
+    { href: `${base}/empleados`, label: 'Empleados', icon: HardHat },
     { href: `${base}/proveedores`, label: 'Proveedores', icon: Truck },
     { href: `${base}/usuarios`, label: 'Usuarios', icon: Users },
   ];
