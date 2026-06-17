@@ -46,7 +46,7 @@ export default function GastosPage() {
   const now = new Date();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterMes, setFilterMes] = useState(now.getMonth() + 1);
+  const [filterMes, setFilterMes] = useState(0);
   const [filterAnio, setFilterAnio] = useState(now.getFullYear());
   const [filterCategoria, setFilterCategoria] = useState<TipoGasto | 'todos'>('todos');
 
@@ -78,9 +78,12 @@ export default function GastosPage() {
         .from('gastos')
         .select('*')
         .eq('proyecto_id', projectId)
-        .eq('mes', filterMes)
         .eq('anio', filterAnio)
         .order('fecha', { ascending: false });
+
+      if (filterMes > 0) {
+        query = query.eq('mes', filterMes);
+      }
 
       if (filterCategoria !== 'todos') {
         query = query.eq('categoria', filterCategoria);
@@ -229,36 +232,31 @@ export default function GastosPage() {
     }
   };
 
-  // Excel export
+  // Excel export — always exports the full year with monthly breakdown + summary
   const handleExport = async () => {
     try {
-      // Fetch all expenses for the selected year (and month if filtered)
-      let query = supabase
+      const { data: allGastos, error } = await supabase
         .from('gastos')
         .select('*')
         .eq('proyecto_id', projectId)
         .eq('anio', filterAnio)
         .order('fecha', { ascending: true });
 
-      if (filterMes) {
-        query = query.eq('mes', filterMes);
-      }
-
-      const { data: allGastos, error } = await query;
       if (error) throw error;
       if (!allGastos || allGastos.length === 0) {
-        showToast('No hay gastos para exportar con los filtros seleccionados', 'error');
+        showToast('No hay gastos para exportar en este año', 'error');
         return;
       }
 
-      // Sheet 1: Resumen - rows per category, columns per month + total
+      const categoriasKeys: TipoGasto[] = ['nomina', 'seguros', 'materiales', 'otros'];
+
+      // Sheet 1: Resumen Anual — rows per category, columns per month + total
       const resumenHeaders = [
-        { key: 'categoria', label: 'Categoria' },
+        { key: 'categoria', label: 'Categoría' },
         ...MESES.map((m, i) => ({ key: `mes_${i + 1}`, label: m })),
         { key: 'total', label: 'Total' },
       ];
 
-      const categoriasKeys: TipoGasto[] = ['nomina', 'seguros', 'materiales', 'otros'];
       const resumenData = categoriasKeys.map((cat) => {
         const row: Record<string, unknown> = { categoria: CATEGORIAS_GASTO[cat] };
         let catTotal = 0;
@@ -273,7 +271,6 @@ export default function GastosPage() {
         return row;
       });
 
-      // Add grand total row
       const grandTotalRow: Record<string, unknown> = { categoria: 'TOTAL GENERAL' };
       let grandTotalSum = 0;
       for (let m = 1; m <= 12; m++) {
@@ -286,8 +283,9 @@ export default function GastosPage() {
       grandTotalRow.total = formatCurrency(grandTotalSum);
       resumenData.push(grandTotalRow);
 
-      // Detail sheet headers
+      // Detail headers for per-category sheets
       const detailHeaders = [
+        { key: 'mes', label: 'Mes' },
         { key: 'fecha', label: 'Fecha' },
         { key: 'concepto', label: 'Concepto' },
         { key: 'monto', label: 'Monto' },
@@ -295,28 +293,43 @@ export default function GastosPage() {
         { key: 'notas', label: 'Notas' },
       ];
 
-      const makeDetailData = (cat: TipoGasto) =>
-        allGastos
+      const makeDetailData = (cat: TipoGasto) => {
+        const items = allGastos
           .filter((g) => g.categoria === cat)
           .map((g) => ({
+            mes: MESES[g.mes - 1] ?? '',
             fecha: formatDate(g.fecha),
             concepto: g.concepto,
             monto: formatCurrency(g.monto),
             proveedor: g.proveedor ?? '',
             notas: g.notas ?? '',
           }));
+        if (items.length > 0) {
+          const catTotal = allGastos
+            .filter((g) => g.categoria === cat)
+            .reduce((sum, g) => sum + g.monto, 0);
+          items.push({
+            mes: '',
+            fecha: '',
+            concepto: 'TOTAL',
+            monto: formatCurrency(catTotal),
+            proveedor: '',
+            notas: '',
+          });
+        }
+        return items;
+      };
 
       const sheets = [
-        { name: 'Resumen', data: resumenData, headers: resumenHeaders },
-        { name: 'Nominas', data: makeDetailData('nomina'), headers: detailHeaders },
+        { name: 'Resumen Anual', data: resumenData, headers: resumenHeaders },
+        { name: 'Nóminas', data: makeDetailData('nomina'), headers: detailHeaders },
         { name: 'Legales', data: makeDetailData('seguros'), headers: detailHeaders },
         { name: 'Materiales', data: makeDetailData('materiales'), headers: detailHeaders },
         { name: 'Otros Gastos', data: makeDetailData('otros'), headers: detailHeaders },
       ];
 
-      const mesName = MESES[filterMes - 1] ?? '';
-      const filename = `Gastos_Acabados_RO_${filterAnio}_${mesName}`;
-      exportMultiSheetExcel(sheets, filename);
+      const filename = `Reporte_Gastos_Acabados_RO_${filterAnio}`;
+      exportMultiSheetExcel(sheets, filename, `Acabados RO — Reporte de Gastos ${filterAnio}`);
       showToast('Reporte Excel exportado correctamente', 'success');
     } catch (err) {
       console.error('Error exporting:', err);
@@ -390,6 +403,7 @@ export default function GastosPage() {
               onChange={(e) => setFilterMes(Number(e.target.value))}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
             >
+              <option value={0}>Todos los meses</option>
               {MESES.map((mes, i) => (
                 <option key={i} value={i + 1}>
                   {mes}

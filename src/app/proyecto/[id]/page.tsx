@@ -46,15 +46,11 @@ export default function ProjectDashboardPage() {
           setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || '');
         }
 
-        const now = new Date();
-        const currentMonth = now.getMonth() + 1;
-        const currentYear = now.getFullYear();
-
         const [materialesRes, ordenesRes, gastosRes, proveedoresRes, lowStockRes] =
           await Promise.all([
             supabase.from('materiales').select('id', { count: 'exact', head: true }),
             supabase.from('ordenes_compra').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente').eq('proyecto_id', projectId),
-            supabase.from('gastos').select('monto').eq('mes', currentMonth).eq('anio', currentYear).eq('proyecto_id', projectId),
+            supabase.from('gastos').select('monto').eq('proyecto_id', projectId),
             supabase.from('proveedores').select('id', { count: 'exact', head: true }),
             supabase.from('materiales').select('id', { count: 'exact', head: true }).lt('cantidad', 5),
           ]);
@@ -96,7 +92,7 @@ export default function ProjectDashboardPage() {
       href: `${base}/ordenes`,
     },
     {
-      label: 'Gastos del Mes',
+      label: 'Total Gastos',
       value: stats.gastosMes,
       icon: DollarSign,
       format: 'currency' as const,
