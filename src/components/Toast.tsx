@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { CheckCircle, XCircle, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 
 interface ToastProps {
   message: string;
@@ -9,38 +9,32 @@ interface ToastProps {
   onClose: () => void;
 }
 
-const toastStyles: Record<string, { bg: string; icon: typeof CheckCircle }> = {
-  success: { bg: 'bg-green-50 border-green-400 text-green-800', icon: CheckCircle },
-  error: { bg: 'bg-red-50 border-red-400 text-red-800', icon: XCircle },
-  info: { bg: 'bg-blue-50 border-blue-400 text-blue-800', icon: Info },
-};
-
-const iconColors: Record<string, string> = {
-  success: 'text-green-500',
-  error: 'text-red-500',
-  info: 'text-blue-500',
+const config: Record<string, { bg: string; border: string; icon: typeof CheckCircle; iconColor: string }> = {
+  success: { bg: 'bg-white', border: 'border-l-4 border-l-green-500', icon: CheckCircle, iconColor: 'text-green-500' },
+  error: { bg: 'bg-white', border: 'border-l-4 border-l-[#8B1A1A]', icon: XCircle, iconColor: 'text-[#8B1A1A]' },
+  info: { bg: 'bg-white', border: 'border-l-4 border-l-[#D4A520]', icon: Info, iconColor: 'text-[#D4A520]' },
 };
 
 export default function Toast({ message, type, onClose }: ToastProps) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
+    const timer = setTimeout(onClose, 3500);
     return () => clearTimeout(timer);
   }, [onClose]);
 
-  const { bg, icon: Icon } = toastStyles[type];
+  const { bg, border, icon: Icon, iconColor } = config[type];
 
   return (
     <div
-      className={`fixed right-4 top-4 z-[200] flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg transition-all duration-300 ease-in-out ${bg}`}
+      className={`animate-slide-in-right fixed right-4 top-4 z-[200] flex items-center gap-3 rounded-lg ${bg} ${border} px-5 py-4 shadow-xl ring-1 ring-gray-100`}
     >
-      <Icon size={20} className={iconColors[type]} />
-      <p className="text-sm font-medium">{message}</p>
+      <Icon size={20} className={iconColor} />
+      <p className="text-sm font-medium text-gray-800">{message}</p>
       <button
         onClick={onClose}
-        className="ml-2 rounded p-0.5 opacity-60 transition-opacity hover:opacity-100"
-        aria-label="Cerrar notificación"
+        className="ml-3 rounded-md p-0.5 text-gray-400 transition-colors hover:text-gray-600"
+        aria-label="Cerrar"
       >
-        <XCircle size={16} />
+        <X size={16} />
       </button>
     </div>
   );

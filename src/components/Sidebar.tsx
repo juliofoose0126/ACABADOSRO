@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -30,10 +31,14 @@ export default function Sidebar() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserEmail(user.email || '');
+      if (user) {
+        setUserEmail(user.email || '');
+        setUserName(user.user_metadata?.full_name || '');
+      }
     });
   }, []);
 
@@ -44,32 +49,46 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger button */}
+      {/* Mobile hamburger */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed top-4 left-4 z-50 rounded-md bg-[#1a365d] p-2 text-white shadow-lg md:hidden"
+        className="fixed left-4 top-4 z-50 rounded-lg bg-[#1a365d] p-2 text-white shadow-lg transition-transform active:scale-95 md:hidden"
         aria-label="Abrir menú"
       >
-        <Menu size={24} />
+        <Menu size={22} />
       </button>
 
-      {/* Overlay for mobile */}
+      {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#1a365d] text-white transition-transform duration-300 ease-in-out md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-gradient-to-b from-[#0f2440] to-[#1a365d] text-white transition-transform duration-300 ease-in-out md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-          <h1 className="text-xl font-bold tracking-wide">Acabados RO</h1>
+        {/* Header with Logo */}
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="overflow-hidden rounded-lg bg-white p-1.5">
+              <Image
+                src="/logo.jpg"
+                alt="Logo"
+                width={36}
+                height={36}
+                className="h-8 w-8 object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-base font-bold tracking-wide">Acabados RO</h1>
+              <div className="mt-0.5 h-0.5 w-16 bg-gradient-to-r from-[#D4A520] to-transparent" />
+            </div>
+          </div>
           <button
             onClick={() => setIsOpen(false)}
             className="rounded-md p-1 hover:bg-white/10 md:hidden"
@@ -80,7 +99,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
           {navLinks.map((link) => {
             const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
             const Icon = link.icon;
@@ -90,14 +109,23 @@ export default function Sidebar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-white/20 text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white/15 text-white shadow-sm'
+                    : 'text-white/60 hover:bg-white/8 hover:text-white'
                 }`}
               >
-                <Icon size={20} />
+                <div className={`rounded-md p-1 transition-colors ${
+                  isActive
+                    ? 'bg-[#D4A520]/20 text-[#D4A520]'
+                    : 'text-white/50 group-hover:text-white/80'
+                }`}>
+                  <Icon size={18} />
+                </div>
                 <span>{link.label}</span>
+                {isActive && (
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[#D4A520]" />
+                )}
               </Link>
             );
           })}
@@ -105,14 +133,26 @@ export default function Sidebar() {
 
         {/* User section */}
         <div className="border-t border-white/10 px-4 py-4">
-          <p className="mb-3 truncate text-xs text-white/60">
-            {userEmail}
-          </p>
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D4A520]/20 text-xs font-bold text-[#D4A520]">
+              {(userName || userEmail).charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              {userName && (
+                <p className="truncate text-xs font-medium text-white/80">
+                  {userName}
+                </p>
+              )}
+              <p className="truncate text-xs text-white/40">
+                {userEmail}
+              </p>
+            </div>
+          </div>
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/50 transition-all hover:bg-[#8B1A1A]/30 hover:text-white"
           >
-            <LogOut size={18} />
+            <LogOut size={16} />
             <span>Cerrar Sesión</span>
           </button>
         </div>

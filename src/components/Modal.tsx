@@ -25,7 +25,6 @@ export default function Modal({
   children,
   size = 'md',
 }: ModalProps) {
-  // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -46,30 +45,29 @@ export default function Modal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 transition-opacity duration-300"
+        className="absolute inset-0 bg-[#0f2440]/60 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
       />
 
-      {/* Modal panel */}
       <div
-        className={`relative w-full ${sizeClasses[size]} transform rounded-xl bg-white shadow-2xl transition-all duration-300 ease-out`}
+        className={`animate-scale-in relative w-full ${sizeClasses[size]} rounded-2xl border border-gray-200 bg-white shadow-2xl`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {/* Gold accent line */}
+        <div className="absolute left-0 right-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-[#D4A520] via-[#E8B82E] to-[#D4A520]" />
+
+        <div className="flex items-center justify-between px-6 pb-3 pt-5">
+          <h2 className="text-lg font-bold text-[#1a365d]">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-1.5 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
             aria-label="Cerrar"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-4">{children}</div>
+        <div className="px-6 pb-6">{children}</div>
       </div>
     </div>
   );
