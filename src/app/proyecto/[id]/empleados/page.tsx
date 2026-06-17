@@ -46,7 +46,8 @@ export default function EmpleadosPage() {
   const [filterEstado, setFilterEstado] = useState<'todos' | 'activo' | 'baja'>('todos');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Selection for bulk baja
+  // Selection mode for bulk baja
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [showFormModal, setShowFormModal] = useState(false);
@@ -294,6 +295,7 @@ export default function EmpleadosPage() {
 
       showToast(`${selectedEmpleados.length} empleado(s) dado(s) de baja`, 'success');
       setShowBulkBajaModal(false);
+      setSelectionMode(false);
       setSelectedIds(new Set());
       fetchEmpleados();
     } catch (err) {
@@ -523,6 +525,15 @@ export default function EmpleadosPage() {
             <Download size={16} />
             Exportar Excel
           </button>
+          {!selectionMode && (
+            <button
+              onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#8B1A1A] px-4 py-2.5 text-sm font-medium text-[#8B1A1A] transition-colors hover:bg-[#8B1A1A]/5"
+            >
+              <UserX size={16} />
+              Dar de Baja
+            </button>
+          )}
           <button
             onClick={openAddModal}
             className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
@@ -581,24 +592,27 @@ export default function EmpleadosPage() {
       </div>
 
       {/* Bulk Baja Bar */}
-      {selectedIds.size > 0 && (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-[#8B1A1A]/20 bg-[#8B1A1A]/5 px-4 py-3">
+      {selectionMode && (
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-[#8B1A1A]/20 bg-[#8B1A1A]/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-medium text-[#8B1A1A]">
-            {selectedIds.size} empleado{selectedIds.size !== 1 ? 's' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+            {selectedIds.size > 0
+              ? `${selectedIds.size} empleado${selectedIds.size !== 1 ? 's' : ''} seleccionado${selectedIds.size !== 1 ? 's' : ''}`
+              : 'Selecciona los empleados a dar de baja'}
           </p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setSelectedIds(new Set())}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
             >
-              Deseleccionar
+              Cancelar
             </button>
             <button
               onClick={() => {
                 setFechaBaja(new Date().toISOString().split('T')[0]);
                 setShowBulkBajaModal(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B1A1A] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#A52222]"
+              disabled={selectedIds.size === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B1A1A] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#A52222] disabled:opacity-40"
             >
               <MessageCircle size={14} />
               Dar de Baja y Notificar por WhatsApp
@@ -629,7 +643,7 @@ export default function EmpleadosPage() {
               } bg-white p-4 shadow-sm ring-1 ring-gray-100`}
             >
               <div className="mb-2 flex items-start gap-3">
-                {emp.estado === 'activo' && (
+                {selectionMode && emp.estado === 'activo' && (
                   <button onClick={() => toggleSelect(emp.id)} className="mt-0.5 shrink-0">
                     {selectedIds.has(emp.id) ? (
                       <CheckSquare size={18} className="text-[#8B1A1A]" />
@@ -688,16 +702,18 @@ export default function EmpleadosPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-3 py-3 text-center">
-                  <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
-                    {filteredEmpleados.filter((e) => e.estado === 'activo').length > 0 &&
-                     filteredEmpleados.filter((e) => e.estado === 'activo').every((e) => selectedIds.has(e.id)) ? (
-                      <CheckSquare size={16} className="text-[#8B1A1A]" />
-                    ) : (
-                      <Square size={16} />
-                    )}
-                  </button>
-                </th>
+                {selectionMode && (
+                  <th className="px-3 py-3 text-center">
+                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
+                      {filteredEmpleados.filter((e) => e.estado === 'activo').length > 0 &&
+                       filteredEmpleados.filter((e) => e.estado === 'activo').every((e) => selectedIds.has(e.id)) ? (
+                        <CheckSquare size={16} className="text-[#8B1A1A]" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
+                  </th>
+                )}
                 <th className="px-4 py-3 font-semibold text-gray-600">Nombre Completo</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">Puesto</th>
                 <th className="px-4 py-3 font-semibold text-gray-600">CURP</th>
@@ -711,7 +727,7 @@ export default function EmpleadosPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-100">
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: selectionMode ? 8 : 7 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <span className="inline-block h-4 w-full max-w-[120px] animate-pulse rounded bg-gray-200" />
                       </td>
@@ -720,7 +736,7 @@ export default function EmpleadosPage() {
                 ))
               ) : filteredEmpleados.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={selectionMode ? 8 : 7} className="px-4 py-12 text-center text-gray-400">
                     No se encontraron empleados.
                   </td>
                 </tr>
@@ -729,19 +745,21 @@ export default function EmpleadosPage() {
                   <tr key={emp.id} className={`border-b border-gray-100 transition-colors hover:bg-gray-50 ${
                     selectedIds.has(emp.id) ? 'bg-red-50/30' : ''
                   }`}>
-                    <td className="px-3 py-3 text-center">
-                      {emp.estado === 'activo' ? (
-                        <button onClick={() => toggleSelect(emp.id)}>
-                          {selectedIds.has(emp.id) ? (
-                            <CheckSquare size={16} className="text-[#8B1A1A]" />
-                          ) : (
-                            <Square size={16} className="text-gray-300 hover:text-gray-500" />
-                          )}
-                        </button>
-                      ) : (
-                        <span className="inline-block w-4" />
-                      )}
-                    </td>
+                    {selectionMode && (
+                      <td className="px-3 py-3 text-center">
+                        {emp.estado === 'activo' ? (
+                          <button onClick={() => toggleSelect(emp.id)}>
+                            {selectedIds.has(emp.id) ? (
+                              <CheckSquare size={16} className="text-[#8B1A1A]" />
+                            ) : (
+                              <Square size={16} className="text-gray-300 hover:text-gray-500" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="inline-block w-4" />
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium text-gray-900">
                       <div className="flex items-center gap-2">
                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
