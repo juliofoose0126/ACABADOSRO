@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   DollarSign,
   Truck,
+  Users,
   LogOut,
   Menu,
   X,
@@ -21,12 +22,20 @@ const navLinks = [
   { href: '/ordenes', label: 'Órdenes de Compra', icon: ShoppingCart },
   { href: '/gastos', label: 'Gastos', icon: DollarSign },
   { href: '/proveedores', label: 'Proveedores', icon: Truck },
+  { href: '/usuarios', label: 'Usuarios', icon: Users },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserEmail(user.email || '');
+    });
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -97,7 +106,7 @@ export default function Sidebar() {
         {/* User section */}
         <div className="border-t border-white/10 px-4 py-4">
           <p className="mb-3 truncate text-xs text-white/60">
-            acabadosrojulio@gmail.com
+            {userEmail}
           </p>
           <button
             onClick={handleLogout}
