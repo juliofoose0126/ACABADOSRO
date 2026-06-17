@@ -8,6 +8,7 @@ import {
   DollarSign,
   TrendingUp,
   Truck,
+  HardHat,
   Plus,
   ArrowRight,
   AlertTriangle,
@@ -20,6 +21,7 @@ interface Stats {
   totalIngresos: number;
   totalGastos: number;
   totalProveedores: number;
+  totalEmpleados: number;
   lowStockCount: number;
 }
 
@@ -36,6 +38,7 @@ export default function ProjectDashboardPage() {
     totalIngresos: 0,
     totalGastos: 0,
     totalProveedores: 0,
+    totalEmpleados: 0,
     lowStockCount: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -48,13 +51,14 @@ export default function ProjectDashboardPage() {
           setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || '');
         }
 
-        const [materialesRes, ordenesRes, ingresosRes, gastosRes, proveedoresRes, lowStockRes] =
+        const [materialesRes, ordenesRes, ingresosRes, gastosRes, proveedoresRes, empleadosRes, lowStockRes] =
           await Promise.all([
             supabase.from('materiales').select('id', { count: 'exact', head: true }),
             supabase.from('ordenes_compra').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente').eq('proyecto_id', projectId),
             supabase.from('ingresos').select('monto').eq('proyecto_id', projectId),
             supabase.from('gastos').select('monto').eq('proyecto_id', projectId),
             supabase.from('proveedores').select('id', { count: 'exact', head: true }),
+            supabase.from('empleados').select('id', { count: 'exact', head: true }).eq('proyecto_id', projectId).eq('estado', 'activo'),
             supabase.from('materiales').select('id', { count: 'exact', head: true }).lt('cantidad', 5),
           ]);
 
@@ -67,6 +71,7 @@ export default function ProjectDashboardPage() {
           totalIngresos: ingresoTotal,
           totalGastos: gastoTotal,
           totalProveedores: proveedoresRes.count ?? 0,
+          totalEmpleados: empleadosRes.count ?? 0,
           lowStockCount: lowStockRes.count ?? 0,
         });
       } catch (err) {
@@ -113,6 +118,14 @@ export default function ProjectDashboardPage() {
       href: `${base}/inventario`,
     },
     {
+      label: 'Empleados Activos',
+      value: stats.totalEmpleados,
+      icon: HardHat,
+      format: 'number' as const,
+      color: 'from-[#16a34a] to-[#22c55e]',
+      href: `${base}/empleados`,
+    },
+    {
       label: 'Proveedores',
       value: stats.totalProveedores,
       icon: Truck,
@@ -127,6 +140,7 @@ export default function ProjectDashboardPage() {
     { label: 'Registrar Gasto', href: `${base}/gastos`, icon: DollarSign },
     { label: 'Nueva Orden', href: `${base}/ordenes`, icon: ShoppingCart },
     { label: 'Nuevo Material', href: `${base}/inventario`, icon: Package },
+    { label: 'Alta Empleado', href: `${base}/empleados`, icon: HardHat },
     { label: 'Nuevo Proveedor', href: `${base}/proveedores`, icon: Truck },
   ];
 
@@ -170,7 +184,7 @@ export default function ProjectDashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {statCards.map((card, idx) => {
           const Icon = card.icon;
           return (
@@ -236,7 +250,7 @@ export default function ProjectDashboardPage() {
           <Plus size={16} />
           Acciones Rápidas
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {quickActions.map((action) => {
             const Icon = action.icon;
             return (
