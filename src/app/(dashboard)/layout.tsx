@@ -44,15 +44,26 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/login');
+          return;
+        }
       }
       setLoading(false);
     };
 
     checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push('/login');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [router]);
 
   if (loading) {
