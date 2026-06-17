@@ -12,6 +12,8 @@ const CATEGORIA_COLORS: Record<TipoGasto, { border: string; bg: string; text: st
   nomina: { border: 'border-l-blue-500', bg: 'bg-blue-100', text: 'text-blue-800' },
   seguros: { border: 'border-l-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800' },
   materiales: { border: 'border-l-amber-500', bg: 'bg-amber-100', text: 'text-amber-800' },
+  palazuelos: { border: 'border-l-rose-500', bg: 'bg-rose-100', text: 'text-rose-800' },
+  empleados: { border: 'border-l-cyan-500', bg: 'bg-cyan-100', text: 'text-cyan-800' },
   otros: { border: 'border-l-purple-500', bg: 'bg-purple-100', text: 'text-purple-800' },
 };
 
@@ -112,9 +114,11 @@ export default function GastosPage() {
     nomina: totalByCategoria('nomina'),
     seguros: totalByCategoria('seguros'),
     materiales: totalByCategoria('materiales'),
+    palazuelos: totalByCategoria('palazuelos'),
+    empleados: totalByCategoria('empleados'),
     otros: totalByCategoria('otros'),
   };
-  const granTotal = totals.nomina + totals.seguros + totals.materiales + totals.otros;
+  const granTotal = Object.values(totals).reduce((sum, v) => sum + v, 0);
 
   // Form handlers
   const openAddModal = () => {
@@ -248,7 +252,7 @@ export default function GastosPage() {
         return;
       }
 
-      const categoriasKeys: TipoGasto[] = ['nomina', 'seguros', 'materiales', 'otros'];
+      const categoriasKeys: TipoGasto[] = ['nomina', 'seguros', 'materiales', 'palazuelos', 'empleados', 'otros'];
 
       // Sheet 1: Resumen Anual — rows per category, columns per month + total
       const resumenHeaders = [
@@ -325,6 +329,8 @@ export default function GastosPage() {
         { name: 'Nóminas', data: makeDetailData('nomina'), headers: detailHeaders },
         { name: 'Legales', data: makeDetailData('seguros'), headers: detailHeaders },
         { name: 'Materiales', data: makeDetailData('materiales'), headers: detailHeaders },
+        { name: 'Palazuelos', data: makeDetailData('palazuelos'), headers: detailHeaders },
+        { name: 'Empleados', data: makeDetailData('empleados'), headers: detailHeaders },
         { name: 'Otros Gastos', data: makeDetailData('otros'), headers: detailHeaders },
       ];
 
@@ -342,9 +348,11 @@ export default function GastosPage() {
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   const summaryCards = [
-    { label: 'Total Nominas', value: totals.nomina, cat: 'nomina' as TipoGasto },
+    { label: 'Total Nóminas', value: totals.nomina, cat: 'nomina' as TipoGasto },
     { label: 'Total Legales', value: totals.seguros, cat: 'seguros' as TipoGasto },
     { label: 'Total Materiales', value: totals.materiales, cat: 'materiales' as TipoGasto },
+    { label: 'Total Palazuelos', value: totals.palazuelos, cat: 'palazuelos' as TipoGasto },
+    { label: 'Total Empleados', value: totals.empleados, cat: 'empleados' as TipoGasto },
     { label: 'Total Otros', value: totals.otros, cat: 'otros' as TipoGasto },
   ];
 
@@ -450,7 +458,7 @@ export default function GastosPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {summaryCards.map((card) => (
           <div
             key={card.cat}

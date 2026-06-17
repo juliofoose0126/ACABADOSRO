@@ -85,7 +85,7 @@ export interface OrdenDetalle {
   materiales?: Material;
 }
 
-export type TipoGasto = 'nomina' | 'seguros' | 'materiales' | 'otros';
+export type TipoGasto = 'nomina' | 'seguros' | 'materiales' | 'palazuelos' | 'empleados' | 'otros';
 
 export interface Gasto {
   id: string;
@@ -137,6 +137,8 @@ export const CATEGORIAS_GASTO: Record<TipoGasto, string> = {
   nomina: 'Nóminas',
   seguros: 'Legales',
   materiales: 'Materiales',
+  palazuelos: 'Palazuelos',
+  empleados: 'Empleados',
   otros: 'Otros Gastos',
 };
 
