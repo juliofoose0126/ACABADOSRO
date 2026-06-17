@@ -174,3 +174,25 @@ export const TIPOS_DOCUMENTO: Record<TipoDocEmpleado, string> = {
   alta_imss: 'Alta de IMSS',
   baja_imss: 'Baja del IMSS',
 };
+
+export type TipoDocRO = 'constancia_fiscal' | 'declaracion_mensual' | 'pago_imss' | 'pago_infonavit' | 'recibos_nomina' | 'estado_cuenta';
+
+export interface DocumentoRO {
+  id: string;
+  tipo: TipoDocRO;
+  mes: number;
+  anio: number;
+  nombre_archivo: string;
+  storage_path: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export const TIPOS_DOC_RO: Record<TipoDocRO, string> = {
+  constancia_fiscal: 'Constancia de Situación Fiscal',
+  declaracion_mensual: 'Declaración Mensual de Impuestos',
+  pago_imss: 'Pago de IMSS',
+  pago_infonavit: 'Pago de INFONAVIT',
+  recibos_nomina: 'Recibos de Nómina',
+  estado_cuenta: 'Estado de Cuenta Bancario',
+};
