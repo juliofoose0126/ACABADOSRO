@@ -264,16 +264,46 @@ export default function FacturacionPage() {
   const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      showToast('Solo se aceptan imágenes (JPG, PNG)', 'error');
+
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+
+    if (!isImage && !isPdf) {
+      showToast('Solo se aceptan imágenes (JPG, PNG) o documentos PDF', 'error');
       return;
     }
+
     setUploadFile(file);
     setOcrProcessing(true);
-    showToast('Analizando factura... esto puede tomar unos segundos', 'success');
+    showToast(
+      isPdf ? 'Leyendo PDF... extrayendo datos' : 'Analizando imagen... esto puede tomar unos segundos',
+      'success'
+    );
+
     try {
-      const Tesseract = await import('tesseract.js');
-      const { data: { text } } = await Tesseract.recognize(file, 'spa');
+      let text = '';
+
+      if (isPdf) {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const pages: string[] = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const strings = content.items
+            .filter((item: any) => 'str' in item)
+            .map((item: any) => item.str);
+          pages.push(strings.join(' '));
+        }
+        text = pages.join('\n');
+      } else {
+        const Tesseract = await import('tesseract.js');
+        const { data: { text: ocrText } } = await Tesseract.recognize(file, 'spa');
+        text = ocrText;
+      }
+
       const extracted = extractCfdiFactura(text);
       setForm((prev) => ({
         fecha: extracted.fecha || prev.fecha,
@@ -289,12 +319,12 @@ export default function FacturacionPage() {
       }));
       const count = Object.values(extracted).filter(Boolean).length;
       if (count > 0) {
-        showToast(`Se extrajeron ${count} dato${count !== 1 ? 's' : ''}. Verifica los campos.`, 'success');
+        showToast(`Se extrajeron ${count} dato${count !== 1 ? 's' : ''} del ${isPdf ? 'PDF' : 'imagen'}. Verifica los campos.`, 'success');
       } else {
         showToast('No se pudieron extraer datos claros. Ingresa manualmente.', 'error');
       }
     } catch {
-      showToast('Error al analizar la imagen', 'error');
+      showToast('Error al analizar el archivo', 'error');
     } finally {
       setOcrProcessing(false);
       if (ocrInputRef.current) ocrInputRef.current.value = '';
@@ -795,7 +825,7 @@ export default function FacturacionPage() {
             <input
               ref={ocrInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf"
               className="hidden"
               onChange={handleOcrUpload}
             />
@@ -811,19 +841,20 @@ export default function FacturacionPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  <span className="text-sm font-medium text-[#D4A520]">Analizando factura...</span>
+                  <span className="text-sm font-medium text-[#D4A520]">Analizando documento...</span>
                 </>
               ) : (
                 <>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <Camera size={24} className="text-[#D4A520]" />
+                    <FileText size={22} className="text-[#D4A520]/80" />
                     <Upload size={20} className="text-[#D4A520]/60" />
                   </div>
                   <span className="text-sm font-medium text-[#D4A520]">
-                    Subir foto de factura / CFDI
+                    Subir foto o PDF de factura / CFDI
                   </span>
                   <span className="text-xs text-gray-400">
-                    Se extraerán fecha, montos, folio fiscal y más automáticamente
+                    Acepta imágenes (JPG, PNG) y documentos PDF — extrae datos automáticamente
                   </span>
                 </>
               )}
