@@ -14,6 +14,7 @@ import {
   Users,
   HardHat,
   FolderOpen,
+  FileText,
   LogOut,
   Menu,
   X,
@@ -43,6 +44,7 @@ export default function ProjectSidebar({ projectId, projectName }: Props) {
     { href: `${base}/gastos`, label: 'Gastos', icon: DollarSign },
     { href: `${base}/empleados`, label: 'Empleados', icon: HardHat },
     { href: `${base}/proveedores`, label: 'Proveedores', icon: Truck },
+    { href: `${base}/facturacion`, label: 'Facturación RO', icon: FileText },
     { href: `${base}/documentos`, label: 'Documentos RO', icon: FolderOpen },
     { href: `${base}/usuarios`, label: 'Usuarios', icon: Users },
   ];

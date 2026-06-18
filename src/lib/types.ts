@@ -196,3 +196,21 @@ export const TIPOS_DOC_RO: Record<TipoDocRO, string> = {
   recibos_nomina: 'Recibos de Nómina',
   estado_cuenta: 'Estado de Cuenta Bancario',
 };
+
+export interface FacturaRO {
+  id: string;
+  fecha: string;
+  documento: string;
+  descripcion: string;
+  folio_fiscal: string | null;
+  subtotal: number;
+  iva: number;
+  total: number;
+  forma_pago: string | null;
+  cuenta: string | null;
+  nombre_archivo: string | null;
+  storage_path: string | null;
+  proyecto_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
