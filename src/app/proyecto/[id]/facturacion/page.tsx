@@ -26,7 +26,7 @@ interface FacturaForm {
 
 const emptyForm: FacturaForm = {
   fecha: '',
-  documento: '',
+  documento: 'FACTURA',
   cliente: '',
   descripcion: '',
   folio_fiscal: '',
@@ -36,6 +36,9 @@ const emptyForm: FacturaForm = {
   forma_pago: '',
   cuenta: '',
 };
+
+const TIPOS_DOCUMENTO = ['FACTURA', 'COMPLEMENTO', 'NC'] as const;
+const FORMAS_PAGO = ['CREDITO', 'DEBITO', 'TRANSFERENCIA', 'EFECTIVO'] as const;
 
 function extractCfdiFactura(text: string): Partial<FacturaForm> {
   const result: Partial<FacturaForm> = {};
@@ -80,36 +83,27 @@ function extractCfdiFactura(text: string): Partial<FacturaForm> {
   }
 
   // Forma de pago
-  if (/TRANSFERENCIA/i.test(upper)) result.forma_pago = 'Transferencia';
-  else if (/EFECTIVO/i.test(upper)) result.forma_pago = 'Efectivo';
-  else if (/CHEQUE/i.test(upper)) result.forma_pago = 'Cheque';
-  else if (/TARJETA/i.test(upper)) result.forma_pago = 'Tarjeta';
+  if (/TRANSFERENCIA/i.test(upper)) result.forma_pago = 'TRANSFERENCIA';
+  else if (/TARJETA\s*DE\s*D[EÉ]BITO|DEBITO/i.test(upper)) result.forma_pago = 'DEBITO';
+  else if (/TARJETA\s*DE\s*CR[EÉ]DITO|CREDITO/i.test(upper)) result.forma_pago = 'CREDITO';
+  else if (/EFECTIVO/i.test(upper)) result.forma_pago = 'EFECTIVO';
 
-  // Documento — nombre emisor
+  // Documento — tipo de comprobante (FACTURA, COMPLEMENTO, NC)
+  if (/COMPLEMENTO/i.test(upper)) result.documento = 'COMPLEMENTO';
+  else if (/NOTA\s*DE\s*CR[EÉ]DITO/i.test(upper)) result.documento = 'NC';
+  else if (/INGRESO|FACTURA|COMPROBANTE/i.test(upper)) result.documento = 'FACTURA';
+
+  // Cliente — nombre emisor (la empresa que emite la factura)
   for (const line of lines) {
     if (/nombre\s*emisor/i.test(line) && line.includes(':')) {
-      const val = line.split(':').slice(1).join(':').trim();
-      if (val.length > 2) { result.documento = val; break; }
-    }
-  }
-  if (!result.documento) {
-    const emisorMatch = upper.match(/NOMBRE\s*EMISOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
-    if (emisorMatch && emisorMatch[1].trim().length > 2) {
-      result.documento = emisorMatch[1].trim();
-    }
-  }
-
-  // Cliente — nombre receptor
-  for (const line of lines) {
-    if (/nombre\s*receptor/i.test(line) && line.includes(':')) {
       const val = line.split(':').slice(1).join(':').trim();
       if (val.length > 2) { result.cliente = val; break; }
     }
   }
   if (!result.cliente) {
-    const receptorMatch = upper.match(/NOMBRE\s*RECEPTOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
-    if (receptorMatch && receptorMatch[1].trim().length > 2) {
-      result.cliente = receptorMatch[1].trim();
+    const emisorMatch = upper.match(/NOMBRE\s*EMISOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
+    if (emisorMatch && emisorMatch[1].trim().length > 2) {
+      result.cliente = emisorMatch[1].trim();
     }
   }
 
@@ -130,18 +124,11 @@ function extractCfdiFactura(text: string): Partial<FacturaForm> {
     }
   }
 
-  // Cuenta — look for CLABE, cuenta bancaria
-  const clabeMatch = text.match(/CLABE[:\s]*(\d{18})/i);
-  if (clabeMatch) {
-    result.cuenta = `CLABE: ${clabeMatch[1]}`;
-  } else {
-    const cuentaMatch = text.match(/CUENTA[:\s]*(\d{8,20})/i);
-    if (cuentaMatch) result.cuenta = cuentaMatch[1];
+  // Cuenta — detect bank name
+  const bancos = ['INBURSA', 'BBVA', 'BANREGIO', 'BANAMEX', 'SANTANDER', 'HSBC', 'SCOTIABANK', 'BANORTE', 'AZTECA'];
+  for (const banco of bancos) {
+    if (upper.includes(banco)) { result.cuenta = banco; break; }
   }
-
-  // RFC emisor as fallback for cuenta/notas
-  const rfcEmisor = upper.match(/RFC\s*EMISOR[:\s]*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/);
-  if (rfcEmisor && !result.cuenta) result.cuenta = `RFC: ${rfcEmisor[1]}`;
 
   return result;
 }
@@ -315,8 +302,8 @@ export default function FacturacionPage() {
   };
 
   const handleSave = async () => {
-    if (!form.fecha || !form.documento.trim() || !form.descripcion.trim()) {
-      showToast('Completa los campos obligatorios: fecha, documento y descripción', 'error');
+    if (!form.fecha || !form.documento.trim() || !form.cliente.trim() || !form.descripcion.trim()) {
+      showToast('Completa los campos obligatorios: fecha, documento, cliente y descripción', 'error');
       return;
     }
 
@@ -865,25 +852,29 @@ export default function FacturacionPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Documento <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 name="documento"
                 value={form.documento}
                 onChange={handleFormChange}
-                placeholder="Nombre del emisor o tipo de documento"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
-              />
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              >
+                {TIPOS_DOCUMENTO.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Cliente <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               name="cliente"
               value={form.cliente}
               onChange={handleFormChange}
-              placeholder="Nombre del cliente / receptor"
+              placeholder="Nombre de la empresa / proveedor"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
             />
           </div>
@@ -892,12 +883,12 @@ export default function FacturacionPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Descripción <span className="text-red-500">*</span>
             </label>
-            <textarea
+            <input
+              type="text"
               name="descripcion"
               value={form.descripcion}
               onChange={handleFormChange}
-              rows={2}
-              placeholder="Descripción del concepto facturado"
+              placeholder="MATERIAL, INTERNET, TELEFONO, ALIMENTOS..."
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
             />
           </div>
@@ -968,14 +959,17 @@ export default function FacturacionPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Forma de Pago</label>
-              <input
-                type="text"
+              <select
                 name="forma_pago"
                 value={form.forma_pago}
                 onChange={handleFormChange}
-                placeholder="Transferencia, Efectivo, Cheque..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
-              />
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+              >
+                <option value="">— Sin especificar —</option>
+                {FORMAS_PAGO.map((fp) => (
+                  <option key={fp} value={fp}>{fp}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Cuenta</label>
@@ -984,7 +978,7 @@ export default function FacturacionPage() {
                 name="cuenta"
                 value={form.cuenta}
                 onChange={handleFormChange}
-                placeholder="Número de cuenta, CLABE, RFC..."
+                placeholder="INBURSA, BBVA, BANREGIO..."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
               />
             </div>
