@@ -40,209 +40,314 @@ const emptyForm: FacturaForm = {
 const TIPOS_DOCUMENTO = ['FACTURA', 'COMPLEMENTO', 'NC'] as const;
 const FORMAS_PAGO = ['CREDITO', 'DEBITO', 'TRANSFERENCIA', 'EFECTIVO'] as const;
 
+function findValueNearLabel(lines: string[], labelPattern: RegExp, maxDistance = 3): string | null {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = line.match(labelPattern);
+    if (!m) continue;
+    // Value on same line after the label
+    const afterLabel = line.substring(m.index! + m[0].length).trim().replace(/^[:\s]+/, '');
+    if (afterLabel.length > 1) return afterLabel;
+    // Value on next lines
+    for (let j = 1; j <= maxDistance && i + j < lines.length; j++) {
+      const next = lines[i + j].trim();
+      if (next.length > 1 && !/^[-─═]+$/.test(next)) return next;
+    }
+  }
+  return null;
+}
+
+function cleanAmount(s: string): string {
+  return s.replace(/[$,\s]/g, '').replace(/^0+(\d)/, '$1');
+}
+
 function extractCfdiFactura(text: string): Partial<FacturaForm> {
   const result: Partial<FacturaForm> = {};
-  const upper = text.toUpperCase();
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  const joined = lines.join(' ');
-  const joinedUpper = joined.toUpperCase();
+  const allText = lines.join(' ');
+  const allUpper = allText.toUpperCase();
 
-  // ── Fecha ──
-  // "Fecha de Expedición: 2025-03-15", "Fecha Expedicion 15/03/2025", "Fecha: 15-Mar-2025"
-  const fechaPatterns = [
-    /FECHA\s*(?:DE\s*)?(?:EXPEDICI[OÓ]N|EMISI[OÓ]N|TIMBRADO)?[:\s]*(\d{4})-(\d{2})-(\d{2})/i,
-    /FECHA\s*(?:DE\s*)?(?:EXPEDICI[OÓ]N|EMISI[OÓ]N|TIMBRADO)?[:\s]*(\d{2})[/\-.](\d{2})[/\-.](\d{4})/i,
-    /(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}/,
-    /(\d{4})-(\d{2})-(\d{2})/,
-    /(\d{2})[/\-.](\d{2})[/\-.](\d{4})/,
-  ];
-  for (const pat of fechaPatterns) {
-    const m = text.match(pat);
-    if (m) {
-      if (m[1].length === 4) {
-        result.fecha = `${m[1]}-${m[2]}-${m[3]}`;
-      } else {
-        result.fecha = `${m[3]}-${m[2]}-${m[1]}`;
-      }
-      break;
+  // ── FECHA ──
+  // Priority: "Fecha Expedición/Emisión" > "Fecha Timbrado" > any date with label > any ISO date
+  const fechaLabeled = allText.match(
+    /[Ff]echa\s*(?:de\s*)?(?:[Ee]xpedici[oó]n|[Ee]misi[oó]n)[:\s]*(\d{4}[-/]\d{2}[-/]\d{2}(?:T\d{2}:\d{2}:\d{2})?)/
+  );
+  if (fechaLabeled) {
+    result.fecha = fechaLabeled[1].substring(0, 10).replace(/\//g, '-');
+  }
+  if (!result.fecha) {
+    const fechaLabeled2 = allText.match(
+      /[Ff]echa\s*(?:de\s*)?(?:[Ee]xpedici[oó]n|[Ee]misi[oó]n)[:\s]*(\d{2})[/\-.](\d{2})[/\-.](\d{4})/
+    );
+    if (fechaLabeled2) result.fecha = `${fechaLabeled2[3]}-${fechaLabeled2[2]}-${fechaLabeled2[1]}`;
+  }
+  if (!result.fecha) {
+    // Any labeled fecha
+    const fechaAny = allText.match(/[Ff]echa[:\s]+(\d{4})-(\d{2})-(\d{2})/);
+    if (fechaAny) result.fecha = `${fechaAny[1]}-${fechaAny[2]}-${fechaAny[3]}`;
+  }
+  if (!result.fecha) {
+    // ISO datetime
+    const isoDate = text.match(/(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}/);
+    if (isoDate) result.fecha = `${isoDate[1]}-${isoDate[2]}-${isoDate[3]}`;
+  }
+  if (!result.fecha) {
+    // Standalone ISO date
+    const iso = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) result.fecha = iso[0];
+  }
+  if (!result.fecha) {
+    // DD/MM/YYYY
+    const dmy = text.match(/(\d{2})[/\-.](\d{2})[/\-.](\d{4})/);
+    if (dmy) result.fecha = `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  }
+
+  // ── FOLIO FISCAL ──
+  // Look near "Folio Fiscal" label first, then any UUID
+  const folioLabeled = allText.match(
+    /[Ff]olio\s*[Ff]iscal\s*(?:del?\s*SAT)?[:\s]*([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})/
+  );
+  if (folioLabeled) {
+    result.folio_fiscal = folioLabeled[1].toUpperCase();
+  } else {
+    const uuid = text.match(/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/);
+    if (uuid) result.folio_fiscal = uuid[0].toUpperCase();
+  }
+
+  // ── MONTOS ──
+  // Strategy: scan each line for labeled amounts to avoid confusion with line-item amounts
+  const amountRe = /\$?\s*([\d,]+\.\d{2})/;
+  let foundSubtotal = '', foundIva = '', foundTotal = '';
+
+  for (const line of lines) {
+    const lineUp = line.toUpperCase();
+
+    // Skip line-item rows (contain quantity + unit price patterns)
+    if (/^\d+\s+\d/.test(line) && !/SUBTOTAL|TOTAL|I\.?V\.?A/i.test(lineUp)) continue;
+
+    const amt = line.match(amountRe);
+    if (!amt) continue;
+    const val = cleanAmount(amt[1]);
+
+    // SUBTOTAL — must say "subtotal" or "sub total" but NOT "total de impuestos"
+    if (/\bSUB\s*-?\s*TOTAL\b/i.test(lineUp) && !/IMPUESTO/i.test(lineUp)) {
+      foundSubtotal = val;
+    }
+    // IVA — "IVA", "I.V.A.", "Impuesto Trasladado", "Total Impuestos Trasladados"
+    else if (/\bI\.?V\.?A\.?\b|IMPUESTOS?\s*TRASLADADOS?|TOTAL\s*DE\s*IMPUESTOS/i.test(lineUp) && !/SUBTOTAL/i.test(lineUp)) {
+      if (!foundIva || parseFloat(val) > parseFloat(foundIva)) foundIva = val;
+    }
+    // TOTAL — "Total" alone on a line (not subtotal, not "total de impuestos")
+    else if (/\bTOTAL\b/i.test(lineUp) && !/\bSUB\s*-?\s*TOTAL\b/i.test(lineUp) && !/IMPUESTO|TRASLADADO|RETENCI/i.test(lineUp)) {
+      foundTotal = val;
     }
   }
 
-  // ── Folio Fiscal (UUID) ──
-  const uuidMatch = text.match(/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/);
-  if (uuidMatch) result.folio_fiscal = uuidMatch[0].toUpperCase();
+  if (foundSubtotal) result.subtotal = foundSubtotal;
+  if (foundIva) result.iva = foundIva;
+  if (foundTotal) result.total = foundTotal;
 
-  // ── Montos: Subtotal, IVA, Total ──
-  const parseAmount = (s: string) => s.replace(/[$,\s]/g, '');
-
-  // Subtotal — multiple patterns
-  const subPatterns = [
-    /SUB\s*-?\s*TOTAL\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-    /SUBTOTAL\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-  ];
-  for (const pat of subPatterns) {
-    const m = joinedUpper.match(pat) || upper.match(pat);
-    if (m) { result.subtotal = parseAmount(m[1]); break; }
+  // Fallback: look in joined text with strict labeled patterns
+  if (!result.subtotal) {
+    const m = allUpper.match(/\bSUB\s*-?\s*TOTAL\b[:\s]*\$?\s*([\d,]+\.\d{2})/);
+    if (m) result.subtotal = cleanAmount(m[1]);
   }
-
-  // IVA — look for "IVA Trasladado", "IVA 16%", "I.V.A.", "IVA"
-  const ivaPatterns = [
-    /I\.?V\.?A\.?\s*(?:TRASLADADO|16\s*%?)?\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-    /IMPUESTO\s*TRASLADADO\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-    /TOTAL\s*(?:DE\s*)?IMPUESTOS?\s*TRASLADADOS?\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-    /TRASLADOS?\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-  ];
-  for (const pat of ivaPatterns) {
-    const m = joinedUpper.match(pat) || upper.match(pat);
-    if (m) {
-      const val = parseAmount(m[1]);
-      if (parseFloat(val) > 0) { result.iva = val; break; }
+  if (!result.iva) {
+    const m = allUpper.match(/\bI\.?V\.?A\.?\b[^$\d]*\$?\s*([\d,]+\.\d{2})/);
+    if (m) result.iva = cleanAmount(m[1]);
+  }
+  if (!result.total) {
+    // Match "Total" that is NOT preceded by "sub" and NOT followed by "impuesto"
+    const totalMatches = [...allUpper.matchAll(/(?<!SUB\s*)(?<!SUB)\bTOTAL\b(?!\s*(?:DE\s*)?IMPUESTO)[:\s]*\$?\s*([\d,]+\.\d{2})/g)];
+    if (totalMatches.length > 0) {
+      result.total = cleanAmount(totalMatches[totalMatches.length - 1][1]);
     }
   }
 
-  // Total — most specific first, then generic
-  const totalPatterns = [
-    /TOTAL\s*(?:FACTURA|FACTURADO|A\s*PAGAR|COBRAR|CFDI)?\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/gi,
-    /MONTO\s*TOTAL\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-    /IMPORTE\s*TOTAL\s*[:\s$]*\$?\s*([\d,]+\.?\d*)/i,
-  ];
-  for (const pat of totalPatterns) {
-    const matches = [...joinedUpper.matchAll(pat)];
-    if (matches.length === 0) continue;
-    // Pick the largest "TOTAL" value that isn't the subtotal
-    let best = '';
-    for (const m of matches) {
-      const val = parseAmount(m[1]);
-      if (val && parseFloat(val) > parseFloat(best || '0') && val !== result.subtotal) {
-        best = val;
-      }
-    }
-    if (best) { result.total = best; break; }
+  // Calculate missing value from other two
+  const sub = result.subtotal ? parseFloat(result.subtotal) : NaN;
+  const iva = result.iva ? parseFloat(result.iva) : NaN;
+  const tot = result.total ? parseFloat(result.total) : NaN;
+  if (!isNaN(sub) && !isNaN(tot) && isNaN(iva)) {
+    const d = tot - sub;
+    if (d >= 0) result.iva = d.toFixed(2);
+  }
+  if (!isNaN(tot) && !isNaN(iva) && isNaN(sub)) {
+    const d = tot - iva;
+    if (d > 0) result.subtotal = d.toFixed(2);
+  }
+  if (!isNaN(sub) && !isNaN(iva) && isNaN(tot)) {
+    result.total = (sub + iva).toFixed(2);
   }
 
-  // Calculate missing values
-  if (result.subtotal && result.total && !result.iva) {
-    const diff = parseFloat(result.total) - parseFloat(result.subtotal);
-    if (diff > 0) result.iva = diff.toFixed(2);
+  // ── TIPO DE COMPROBANTE ──
+  // "Tipo de Comprobante: I - Ingreso", "Efecto del Comprobante: Ingreso"
+  const tipoLine = findValueNearLabel(lines, /tipo\s*(?:de\s*)?comprobante/i);
+  if (tipoLine) {
+    const tu = tipoLine.toUpperCase();
+    if (/\bP\b|PAGO|COMPLEMENTO/i.test(tu)) result.documento = 'COMPLEMENTO';
+    else if (/\bE\b|EGRESO|NOTA\s*DE\s*CR[EÉ]DITO/i.test(tu)) result.documento = 'NC';
+    else if (/\bI\b|INGRESO/i.test(tu)) result.documento = 'FACTURA';
   }
-  if (result.total && result.iva && !result.subtotal) {
-    const diff = parseFloat(result.total) - parseFloat(result.iva);
-    if (diff > 0) result.subtotal = diff.toFixed(2);
-  }
-  if (result.subtotal && result.iva && !result.total) {
-    result.total = (parseFloat(result.subtotal) + parseFloat(result.iva)).toFixed(2);
+  if (!result.documento) {
+    if (/COMPLEMENTO\s*(?:DE\s*)?PAGO/i.test(allUpper)) result.documento = 'COMPLEMENTO';
+    else if (/NOTA\s*DE\s*CR[EÉ]DITO/i.test(allUpper)) result.documento = 'NC';
+    else if (/EFECTO[:\s]*INGRESO|\bFACTURA\b|COMPROBANTE\s*(?:FISCAL|DE\s*INGRESO)/i.test(allUpper)) result.documento = 'FACTURA';
   }
 
-  // ── Forma de pago ──
-  // "03 - Transferencia electrónica", "Forma de Pago: Transferencia", "99 - Por definir"
-  if (/03\s*[-–—]\s*TRANSFERENCIA|TRANSFERENCIA\s*ELECTR[OÓ]NICA|SPEI/i.test(joinedUpper)) result.forma_pago = 'TRANSFERENCIA';
-  else if (/04\s*[-–—]\s*TARJETA\s*DE\s*CR[EÉ]DITO|TARJETA\s*DE\s*CR[EÉ]DITO/i.test(joinedUpper)) result.forma_pago = 'CREDITO';
-  else if (/28\s*[-–—]\s*TARJETA\s*DE\s*D[EÉ]BITO|TARJETA\s*DE\s*D[EÉ]BITO/i.test(joinedUpper)) result.forma_pago = 'DEBITO';
-  else if (/01\s*[-–—]\s*EFECTIVO|FORMA\s*DE\s*PAGO[:\s]*EFECTIVO/i.test(joinedUpper)) result.forma_pago = 'EFECTIVO';
-  else if (/TRANSFERENCIA/i.test(joinedUpper)) result.forma_pago = 'TRANSFERENCIA';
-  else if (/D[EÉ]BITO/i.test(joinedUpper)) result.forma_pago = 'DEBITO';
-  else if (/CR[EÉ]DITO/i.test(joinedUpper)) result.forma_pago = 'CREDITO';
-  else if (/EFECTIVO/i.test(joinedUpper)) result.forma_pago = 'EFECTIVO';
+  // ── FORMA DE PAGO ──
+  // Look for labeled value first: "Forma de Pago: 03 - Transferencia electrónica"
+  const fpLine = findValueNearLabel(lines, /forma\s*(?:de\s*)?pago/i);
+  const fpText = fpLine ? fpLine.toUpperCase() : allUpper;
+  // Also check "Método de Pago" for PPD/PUE
+  const metodoLine = findValueNearLabel(lines, /m[eé]todo\s*(?:de\s*)?pago/i);
 
-  // ── Documento — tipo de comprobante ──
-  // "Tipo de Comprobante: I - Ingreso", "Efecto: Ingreso", "Complemento de Pago"
-  if (/COMPLEMENTO\s*(?:DE\s*)?PAGO|TIPO[:\s]*P\b/i.test(joinedUpper)) result.documento = 'COMPLEMENTO';
-  else if (/NOTA\s*DE\s*CR[EÉ]DITO|TIPO[:\s]*E\b|EFECTO[:\s]*EGRESO/i.test(joinedUpper)) result.documento = 'NC';
-  else if (/TIPO[:\s]*I\b|EFECTO[:\s]*INGRESO|FACTURA|COMPROBANTE\s*(?:FISCAL|DE\s*INGRESO)/i.test(joinedUpper)) result.documento = 'FACTURA';
-
-  // ── Cliente ──
-  // Try multiple patterns: "Nombre Emisor:", "Emisor:", "Razón Social Emisor:", "RFC Emisor:"
-  // Also "Nombre:" right after "Datos del Emisor", and standalone company names near RFC
-  const clientePatterns = [
-    /(?:NOMBRE|RAZ[OÓ]N\s*SOCIAL)\s*(?:DEL?\s*)?EMISOR[:\s]*([^\n]+)/i,
-    /EMISOR[:\s]*(?:RFC[:\s]*[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}\s*)?([A-ZÁÉÍÓÚÑ\s,\.]{4,})/i,
-    /DATOS\s*(?:DEL?\s*)?EMISOR[^]*?(?:NOMBRE|RAZ[OÓ]N)[:\s]*([^\n]+)/i,
-  ];
-  for (const pat of clientePatterns) {
-    const m = joined.match(pat);
-    if (m && m[1].trim().length > 2) {
-      let val = m[1].trim().replace(/\s+/g, ' ');
-      val = val.replace(/RFC[:\s]*[A-ZÑ&].*/i, '').trim();
-      if (val.length > 2) { result.cliente = val; break; }
-    }
+  if (/03|TRANSFERENCIA|SPEI/i.test(fpText)) result.forma_pago = 'TRANSFERENCIA';
+  else if (/04|TARJETA.*CR[EÉ]DITO/i.test(fpText)) result.forma_pago = 'CREDITO';
+  else if (/28|TARJETA.*D[EÉ]BITO/i.test(fpText)) result.forma_pago = 'DEBITO';
+  else if (/01|EFECTIVO/i.test(fpText)) result.forma_pago = 'EFECTIVO';
+  // If fpLine was used and matched, skip broad search
+  if (!result.forma_pago) {
+    if (/TRANSFERENCIA|SPEI/i.test(allUpper)) result.forma_pago = 'TRANSFERENCIA';
+    else if (/TARJETA.*D[EÉ]BITO/i.test(allUpper)) result.forma_pago = 'DEBITO';
+    else if (/TARJETA.*CR[EÉ]DITO/i.test(allUpper)) result.forma_pago = 'CREDITO';
   }
-  if (!result.cliente) {
+
+  // ── CLIENTE ──
+  // In CFDI: Emisor = who issues the invoice, Receptor = who receives it
+  // For "Facturación RO" (RO's own invoices), Cliente = Receptor
+  // But if the user uploads a supplier invoice, we detect and use Emisor
+  let emisorName = '';
+  let receptorName = '';
+
+  // Extract Emisor name
+  const emisorVal = findValueNearLabel(lines, /(?:nombre|raz[oó]n\s*social)\s*(?:del?\s*)?emisor/i);
+  if (emisorVal) {
+    emisorName = emisorVal.replace(/RFC[:\s]*[A-ZÑ&].*/i, '').replace(/R[eé]gimen.*/i, '').trim();
+  }
+  if (!emisorName) {
     for (const line of lines) {
-      if (/(?:nombre|raz[oó]n)\s*(?:del?\s*)?emisor/i.test(line)) {
-        const val = line.replace(/.*(?:nombre|raz[oó]n)\s*(?:del?\s*)?emisor\s*[:\s]*/i, '').trim();
-        if (val.length > 2) { result.cliente = val; break; }
+      if (/emisor/i.test(line) && /nombre|raz[oó]n/i.test(line)) {
+        const v = line.replace(/.*(?:nombre|raz[oó]n\s*social)\s*(?:del?\s*)?emisor\s*[:\s]*/i, '').trim();
+        if (v.length > 2) { emisorName = v.replace(/RFC.*/i, '').trim(); break; }
       }
     }
   }
-  // Fallback: find company name near "RFC" (SA DE CV, S DE RL, SC, etc.)
+
+  // Extract Receptor name
+  const receptorVal = findValueNearLabel(lines, /(?:nombre|raz[oó]n\s*social)\s*(?:del?\s*)?receptor/i);
+  if (receptorVal) {
+    receptorName = receptorVal.replace(/RFC[:\s]*[A-ZÑ&].*/i, '').replace(/R[eé]gimen.*/i, '').replace(/Uso\s*(?:de\s*)?CFDI.*/i, '').trim();
+  }
+  if (!receptorName) {
+    for (const line of lines) {
+      if (/receptor/i.test(line) && /nombre|raz[oó]n/i.test(line)) {
+        const v = line.replace(/.*(?:nombre|raz[oó]n\s*social)\s*(?:del?\s*)?receptor\s*[:\s]*/i, '').trim();
+        if (v.length > 2) { receptorName = v.replace(/RFC.*/i, '').replace(/Uso\s*(?:de\s*)?CFDI.*/i, '').trim(); break; }
+      }
+    }
+  }
+
+  // Decide: if Emisor is "ACABADOS" (our company), Cliente = Receptor; otherwise Cliente = Emisor
+  const isOwnInvoice = /ACABADOS/i.test(emisorName);
+  if (isOwnInvoice && receptorName.length > 2) {
+    result.cliente = receptorName;
+  } else if (emisorName.length > 2) {
+    result.cliente = emisorName;
+  } else if (receptorName.length > 2) {
+    result.cliente = receptorName;
+  }
+
+  // Fallback: find any company name with SA DE CV, S DE RL patterns
   if (!result.cliente) {
-    const saMatch = joined.match(/([A-ZÁÉÍÓÚÑ\s]{4,}(?:S\.?\s*A\.?\s*(?:DE\s*C\.?\s*V\.?)?|S\.?\s*(?:DE\s*)?R\.?\s*L\.?|S\.?\s*C\.?))/i);
+    const saMatch = allText.match(/([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{3,}(?:S\.?\s*A\.?\s*(?:DE\s*C\.?\s*V\.?)?|S\.?\s*(?:DE\s*)?R\.?\s*L\.?\s*(?:DE\s*C\.?\s*V\.?)?))/);
     if (saMatch) result.cliente = saMatch[1].trim().replace(/\s+/g, ' ');
   }
 
-  // ── Descripción ──
-  // "Concepto:", "Descripción:", "Descripcion del servicio", content after these labels
-  const descPatterns = [
-    /(?:CONCEPTO|DESCRIPCI[OÓ]N)(?:\s*DEL?\s*(?:SERVICIO|BIEN|PRODUCTO|MATERIAL))?[:\s]+([^\n]{6,})/i,
-    /CLAVE\s*(?:PROD|SAT)[^]*?(?:DESCRIPCI[OÓ]N)[:\s]*([^\n]{6,})/i,
-  ];
-  for (const pat of descPatterns) {
-    const m = joined.match(pat);
-    if (m) {
-      let desc = m[1].trim();
-      desc = desc.replace(/(?:CANTIDAD|UNIDAD|VALOR\s*UNIT|IMPORTE|CLAVE|DESCUENTO).*$/i, '').trim();
-      if (desc.length > 3 && !/impuesto|traslado|tasa|base/i.test(desc)) {
-        result.descripcion = desc;
+  // ── DESCRIPCIÓN ──
+  // Look for "Descripción" or "Concepto" in the conceptos section, not in headers
+  const noiseRe = /^(CANTIDAD|UNIDAD|CLAVE|VALOR\s*UNIT|IMPORTE|DESCUENTO|No\.|PRECIO|TASA|BASE|IMPUESTO|TRASLADO|RETENCI)/i;
+
+  // Strategy: find "Descripción" or "Concepto" label, get value on same/next line
+  let descFound = '';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Skip table headers that just say "Descripción" as a column name
+    if (/^(?:CLAVE|No\.)\s/.test(line) && /descripci[oó]n/i.test(line)) continue;
+    if (/^descripci[oó]n$/i.test(line.replace(/[:\s]/g, ''))) {
+      // Label only — check next line
+      if (i + 1 < lines.length && !noiseRe.test(lines[i + 1]) && lines[i + 1].length > 3) {
+        descFound = lines[i + 1];
         break;
       }
+      continue;
+    }
+    const descMatch = line.match(/(?:descripci[oó]n|concepto)\s*[:\s]+(.+)/i);
+    if (descMatch) {
+      let d = descMatch[1].trim();
+      d = d.replace(/(?:CANTIDAD|UNIDAD|VALOR\s*UNIT|IMPORTE|CLAVE|DESCUENTO|No\s*Identificaci).*$/i, '').trim();
+      if (d.length > 3 && !noiseRe.test(d)) { descFound = d; break; }
     }
   }
-  if (!result.descripcion) {
-    for (let i = 0; i < lines.length; i++) {
-      if (/descripci[oó]n|concepto/i.test(lines[i])) {
-        const sameLine = lines[i].replace(/^.*?(?:descripci[oó]n|concepto)\s*[:\s]*/i, '').trim();
-        if (sameLine.length > 5 && !/impuesto|traslado|tasa|base|cantidad|clave/i.test(sameLine)) {
-          result.descripcion = sameLine;
-          break;
-        }
-        if (i + 1 < lines.length) {
-          const next = lines[i + 1];
-          if (next.length > 5 && !/impuesto|traslado|tasa|base|cantidad|clave|unidad/i.test(next)) {
-            result.descripcion = next;
-            break;
-          }
-        }
-      }
+  if (!descFound) {
+    // Fallback: look for labeled concepto
+    const conceptoVal = findValueNearLabel(lines, /concepto/i);
+    if (conceptoVal && conceptoVal.length > 3 && !noiseRe.test(conceptoVal)) {
+      descFound = conceptoVal;
     }
   }
+  if (descFound) result.descripcion = descFound;
 
-  // ── Cuenta — detect bank name ──
-  const bancos = [
+  // ── CUENTA ──
+  // Look near "Cuenta", "Banco", "Número de Cuenta" labels first
+  const cuentaLine = findValueNearLabel(lines, /(?:banco|n[uú]mero\s*de\s*cuenta|cuenta\s*(?:bancaria|beneficiari))/i);
+  const bancoAliases: Record<string, string> = {
+    BANCOMER: 'BBVA', CITIBANAMEX: 'BANAMEX', BAJIO: 'BANBAJIO', 'BANBAJÍO': 'BANBAJIO',
+  };
+  const bancoNames = [
     'INBURSA', 'BBVA', 'BANCOMER', 'BANREGIO', 'BANAMEX', 'CITIBANAMEX',
     'SANTANDER', 'HSBC', 'SCOTIABANK', 'BANORTE', 'AZTECA', 'MULTIVA',
-    'BANBAJIO', 'BAJIO', 'MONEX', 'BANSI', 'AFIRME', 'MIFEL',
+    'BANBAJIO', 'BANBAJÍO', 'BAJIO', 'MONEX', 'BANSI', 'AFIRME', 'MIFEL',
+    'INTERCAM', 'INVEX', 'ACTINVER', 'CIBanco',
   ];
-  for (const banco of bancos) {
-    if (joinedUpper.includes(banco)) {
-      result.cuenta = banco === 'BANCOMER' ? 'BBVA' : banco === 'CITIBANAMEX' ? 'BANAMEX' : banco === 'BAJIO' ? 'BANBAJIO' : banco;
-      break;
+
+  const searchBanks = (source: string) => {
+    const up = source.toUpperCase();
+    for (const b of bancoNames) {
+      if (up.includes(b)) return bancoAliases[b] || b;
     }
+    return null;
+  };
+
+  if (cuentaLine) {
+    const banco = searchBanks(cuentaLine);
+    if (banco) result.cuenta = banco;
+  }
+  if (!result.cuenta) {
+    const banco = searchBanks(allText);
+    if (banco) result.cuenta = banco;
   }
 
-  // ── Fallback: scan for standalone money amounts if we still have nothing ──
+  // ── FALLBACK: money amounts from $X,XXX.XX patterns ──
   if (!result.total && !result.subtotal) {
-    const moneyMatches = [...joined.matchAll(/\$\s*([\d,]+\.\d{2})/g)];
+    const moneyMatches = [...allText.matchAll(/\$\s*([\d,]+\.\d{2})/g)];
     if (moneyMatches.length > 0) {
-      const amounts = moneyMatches.map(m => ({ raw: m[1], val: parseFloat(m[1].replace(/,/g, '')) }));
-      amounts.sort((a, b) => b.val - a.val);
-      if (amounts.length >= 1) result.total = String(amounts[0].val);
-      if (amounts.length >= 3) {
-        result.subtotal = String(amounts[1].val);
-        result.iva = String(amounts[2].val);
+      const amounts = moneyMatches.map(m => parseFloat(m[1].replace(/,/g, '')));
+      amounts.sort((a, b) => b - a);
+      const unique = [...new Set(amounts)];
+      if (unique.length >= 1) result.total = unique[0].toFixed(2);
+      if (unique.length >= 3) {
+        result.subtotal = unique[1].toFixed(2);
+        result.iva = unique[2].toFixed(2);
+      } else if (unique.length === 2) {
+        result.subtotal = unique[1].toFixed(2);
+        const diff = unique[0] - unique[1];
+        if (diff > 0) result.iva = diff.toFixed(2);
       }
     }
   }
 
+  console.log('CFDI extraction results:', result);
   return result;
 }
 
@@ -405,31 +510,37 @@ export default function FacturacionPage() {
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const content = await page.getTextContent();
-          const textItems = content.items.filter((item: any) => 'str' in item && item.str.trim());
-          // Sort by Y position (descending = top to bottom) then X (left to right)
+          const textItems = content.items.filter((item: any) => 'str' in item);
+          // Sort by Y descending (top→bottom), then X ascending (left→right)
           textItems.sort((a: any, b: any) => {
             const dy = b.transform[5] - a.transform[5];
-            if (Math.abs(dy) > 5) return dy;
+            if (Math.abs(dy) > 3) return dy;
             return a.transform[4] - b.transform[4];
           });
-          // Group items on same line (similar Y), join with spaces, separate lines with newline
-          const lineGroups: string[][] = [];
-          let currentY = -Infinity;
+          // Group items into lines by Y proximity
+          const lineGroups: { texts: string[]; y: number }[] = [];
           for (const item of textItems) {
+            const str = (item as any).str;
             const y = (item as any).transform[5];
-            if (Math.abs(y - currentY) > 5) {
-              lineGroups.push([]);
-              currentY = y;
+            const lastGroup = lineGroups[lineGroups.length - 1];
+            if (lastGroup && Math.abs(y - lastGroup.y) <= 3) {
+              lastGroup.texts.push(str);
+            } else {
+              lineGroups.push({ texts: [str], y });
             }
-            lineGroups[lineGroups.length - 1].push((item as any).str);
           }
-          pages.push(lineGroups.map(g => g.join(' ')).join('\n'));
+          // Join each line's items; add ":" separator when a label item ends without one
+          const pageLines = lineGroups.map(g => {
+            const parts = g.texts.filter(t => t.trim());
+            return parts.join(' ');
+          });
+          pages.push(pageLines.join('\n'));
         }
         text = pages.join('\n');
-        console.log('PDF text extracted, length:', text.length, 'preview:', text.substring(0, 500));
+        console.log('PDF extracted (%d chars):\n%s', text.length, text.substring(0, 1000));
       } else {
         const Tesseract = await import('tesseract.js');
-        const { data: { text: ocrText } } = await Tesseract.recognize(file, 'spa', {
+        const { data: { text: ocrText } } = await Tesseract.recognize(file, 'spa+eng', {
           logger: (m: any) => {
             if (m.status === 'recognizing text') {
               const pct = Math.round((m.progress || 0) * 100);
@@ -438,7 +549,7 @@ export default function FacturacionPage() {
           },
         });
         text = ocrText;
-        console.log('OCR text extracted, length:', text.length, 'preview:', text.substring(0, 500));
+        console.log('OCR extracted (%d chars):\n%s', text.length, text.substring(0, 1000));
       }
 
       const extracted = extractCfdiFactura(text);
