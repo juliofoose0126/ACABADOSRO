@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Plus, Edit2, Trash2, Download, DollarSign, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, DollarSign, Calendar, Camera, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Gasto, TipoGasto, MESES, CATEGORIAS_GASTO } from '@/lib/types';
 import { exportMultiSheetExcel, formatCurrency, formatDate } from '@/lib/export-utils';
@@ -35,6 +35,70 @@ const emptyForm: GastoForm = {
   notas: '',
 };
 
+function extractCfdiGasto(text: string): Partial<GastoForm> {
+  const result: Partial<GastoForm> = {};
+  const upper = text.toUpperCase();
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  const totalMatch = upper.match(/TOTAL\s*\$?\s*([\d,]+\.\d{2})/);
+  if (totalMatch) result.monto = totalMatch[1].replace(/,/g, '');
+
+  const dateMatch = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) result.fecha = dateMatch[0];
+
+  for (const line of lines) {
+    if (/nombre\s*emisor|emisor/i.test(line) && line.includes(':')) {
+      const val = line.split(':').slice(1).join(':').trim();
+      if (val.length > 2) { result.proveedor = val; break; }
+    }
+  }
+  if (!result.proveedor) {
+    const emisorMatch = upper.match(/NOMBRE\s*EMISOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
+    if (emisorMatch) result.proveedor = emisorMatch[1].trim();
+  }
+
+  for (const line of lines) {
+    if (/descripci[oó]n/i.test(line)) {
+      const desc = line.replace(/^descripci[oó]n\s*/i, '').trim();
+      if (desc.length > 5) { result.concepto = desc; break; }
+    }
+  }
+  if (!result.concepto) {
+    const descIdx = lines.findIndex((l) => /descripci[oó]n/i.test(l));
+    if (descIdx >= 0 && descIdx + 1 < lines.length) {
+      const nextLine = lines[descIdx + 1];
+      if (nextLine.length > 5 && !/impuesto|traslado|tasa|base/i.test(nextLine)) {
+        result.concepto = nextLine;
+      }
+    }
+  }
+
+  if (/MATERIAL|TABLAROCA|CEMENTO|ARENA|GRAVA|PINTURA|FERRET|PLOMER/i.test(upper)) {
+    result.categoria = 'materiales';
+  } else if (/N[OÓ]MINA|SALARIO|SUELDO/i.test(upper)) {
+    result.categoria = 'nomina';
+  } else if (/SEGURO|IMSS|INFONAVIT|LEGAL|P[OÓ]LIZA/i.test(upper)) {
+    result.categoria = 'seguros';
+  } else if (/PALAZUELOS/i.test(upper)) {
+    result.categoria = 'palazuelos';
+  }
+
+  const notaParts: string[] = [];
+  const subtotalMatch = upper.match(/SUBTOTAL\s*\$?\s*([\d,]+\.\d{2})/);
+  const ivaMatch = upper.match(/IVA\s*\d*\.?\d*%?\s*\$?\s*([\d,]+\.\d{2})/);
+  if (subtotalMatch) notaParts.push(`Subtotal: $${subtotalMatch[1]}`);
+  if (ivaMatch) notaParts.push(`IVA: $${ivaMatch[1]}`);
+  const rfcEmisor = upper.match(/RFC\s*EMISOR[:\s]*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/);
+  if (rfcEmisor) notaParts.push(`RFC Emisor: ${rfcEmisor[1]}`);
+  const uuidMatch = text.match(/[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/i);
+  if (uuidMatch) notaParts.push(`Folio Fiscal: ${uuidMatch[0].toUpperCase()}`);
+  const folioMatch = upper.match(/FOLIO[:\s]*(\d+)/);
+  if (folioMatch) notaParts.push(`Folio: ${folioMatch[1]}`);
+  if (notaParts.length > 0) result.notas = notaParts.join(' | ');
+
+  return result;
+}
+
 interface Toast {
   id: number;
   message: string;
@@ -61,6 +125,9 @@ export default function GastosPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
+
   // Toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
   let toastIdCounter = 0;
@@ -72,6 +139,41 @@ export default function GastosPage() {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
   }, []);
+
+  const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Solo se aceptan imágenes (JPG, PNG)', 'error');
+      return;
+    }
+    setOcrProcessing(true);
+    showToast('Analizando imagen... esto puede tomar unos segundos', 'success');
+    try {
+      const Tesseract = await import('tesseract.js');
+      const { data: { text } } = await Tesseract.recognize(file, 'spa');
+      const extracted = extractCfdiGasto(text);
+      setForm((prev) => ({
+        categoria: extracted.categoria || prev.categoria,
+        concepto: extracted.concepto || prev.concepto,
+        monto: extracted.monto || prev.monto,
+        fecha: extracted.fecha || prev.fecha,
+        proveedor: extracted.proveedor || prev.proveedor,
+        notas: extracted.notas || prev.notas,
+      }));
+      const count = Object.values(extracted).filter(Boolean).length;
+      if (count > 0) {
+        showToast(`Se extrajeron ${count} dato${count !== 1 ? 's' : ''} de la imagen. Verifica los campos.`, 'success');
+      } else {
+        showToast('No se pudieron extraer datos claros. Ingresa manualmente.', 'error');
+      }
+    } catch {
+      showToast('Error al analizar la imagen', 'error');
+    } finally {
+      setOcrProcessing(false);
+      if (ocrInputRef.current) ocrInputRef.current.value = '';
+    }
+  };
 
   const fetchGastos = useCallback(async () => {
     setLoading(true);
@@ -651,6 +753,48 @@ export default function GastosPage() {
         size="lg"
       >
         <div className="space-y-4">
+          {/* OCR Upload — only for new gastos */}
+          {!editingGasto && (
+            <div className="rounded-xl border-2 border-dashed border-[#1a365d]/30 bg-[#1a365d]/5 p-4">
+              <input
+                ref={ocrInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleOcrUpload}
+              />
+              <button
+                type="button"
+                onClick={() => ocrInputRef.current?.click()}
+                disabled={ocrProcessing}
+                className="flex w-full flex-col items-center gap-2 text-center"
+              >
+                {ocrProcessing ? (
+                  <>
+                    <svg className="h-8 w-8 animate-spin text-[#1a365d]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-sm font-medium text-[#1a365d]">Analizando imagen...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Camera size={22} className="text-[#1a365d]" />
+                      <Upload size={18} className="text-[#1a365d]/60" />
+                    </div>
+                    <span className="text-sm font-medium text-[#1a365d]">
+                      Subir foto de factura / comprobante
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      Se extraerán los datos automáticamente
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Categoria <span className="text-red-500">*</span>

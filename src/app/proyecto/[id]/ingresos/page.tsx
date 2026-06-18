@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Plus, Edit2, Trash2, Download, TrendingUp, Calendar } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, TrendingUp, Calendar, Camera, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Ingreso, MetodoPago, MESES, METODOS_PAGO } from '@/lib/types';
 import { exportMultiSheetExcel, formatCurrency, formatDate } from '@/lib/export-utils';
@@ -35,6 +35,67 @@ const emptyForm: IngresoForm = {
   notas: '',
 };
 
+function extractCfdiIngreso(text: string): Partial<IngresoForm> {
+  const result: Partial<IngresoForm> = {};
+  const upper = text.toUpperCase();
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  const totalMatch = upper.match(/TOTAL\s*\$?\s*([\d,]+\.\d{2})/);
+  if (totalMatch) result.monto = totalMatch[1].replace(/,/g, '');
+
+  const dateMatch = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) result.fecha = dateMatch[0];
+
+  const uuidMatch = text.match(/[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/i);
+  if (uuidMatch) result.factura = uuidMatch[0].toUpperCase();
+
+  if (/TRANSFERENCIA/i.test(upper)) result.metodo_pago = 'transferencia';
+  else if (/EFECTIVO/i.test(upper)) result.metodo_pago = 'efectivo';
+  else if (/CHEQUE/i.test(upper)) result.metodo_pago = 'cheque';
+
+  for (const line of lines) {
+    if (/nombre\s*receptor|receptor/i.test(line) && line.includes(':')) {
+      const val = line.split(':').slice(1).join(':').trim();
+      if (val.length > 2) { result.cliente = val; break; }
+    }
+  }
+  if (!result.cliente) {
+    const receptorMatch = upper.match(/NOMBRE\s*RECEPTOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
+    if (receptorMatch) result.cliente = receptorMatch[1].trim();
+  }
+
+  for (const line of lines) {
+    if (/descripci[oó]n/i.test(line)) {
+      const desc = line.replace(/^descripci[oó]n\s*/i, '').trim();
+      if (desc.length > 5) { result.concepto = desc; break; }
+    }
+  }
+  if (!result.concepto) {
+    const descIdx = lines.findIndex((l) => /descripci[oó]n/i.test(l));
+    if (descIdx >= 0 && descIdx + 1 < lines.length) {
+      const nextLine = lines[descIdx + 1];
+      if (nextLine.length > 5 && !/impuesto|traslado|tasa|base/i.test(nextLine)) {
+        result.concepto = nextLine;
+      }
+    }
+  }
+
+  const subtotalMatch = upper.match(/SUBTOTAL\s*\$?\s*([\d,]+\.\d{2})/);
+  const ivaMatch = upper.match(/IVA\s*\d*\.?\d*%?\s*\$?\s*([\d,]+\.\d{2})/);
+  const notaParts: string[] = [];
+  if (subtotalMatch) notaParts.push(`Subtotal: $${subtotalMatch[1]}`);
+  if (ivaMatch) notaParts.push(`IVA: $${ivaMatch[1]}`);
+  const rfcEmisor = upper.match(/RFC\s*EMISOR[:\s]*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/);
+  if (rfcEmisor) notaParts.push(`RFC Emisor: ${rfcEmisor[1]}`);
+  const rfcReceptor = upper.match(/RFC\s*RECEPTOR[:\s]*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/);
+  if (rfcReceptor) notaParts.push(`RFC Receptor: ${rfcReceptor[1]}`);
+  const folioMatch = upper.match(/FOLIO[:\s]*(\d+)/);
+  if (folioMatch) notaParts.push(`Folio: ${folioMatch[1]}`);
+  if (notaParts.length > 0) result.notas = notaParts.join(' | ');
+
+  return result;
+}
+
 interface Toast {
   id: number;
   message: string;
@@ -60,6 +121,9 @@ export default function IngresosPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   let toastIdCounter = 0;
 
@@ -70,6 +134,42 @@ export default function IngresosPage() {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
   }, []);
+
+  const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Solo se aceptan imágenes (JPG, PNG)', 'error');
+      return;
+    }
+    setOcrProcessing(true);
+    showToast('Analizando imagen... esto puede tomar unos segundos', 'success');
+    try {
+      const Tesseract = await import('tesseract.js');
+      const { data: { text } } = await Tesseract.recognize(file, 'spa');
+      const extracted = extractCfdiIngreso(text);
+      setForm((prev) => ({
+        concepto: extracted.concepto || prev.concepto,
+        monto: extracted.monto || prev.monto,
+        fecha: extracted.fecha || prev.fecha,
+        cliente: extracted.cliente || prev.cliente,
+        metodo_pago: extracted.metodo_pago || prev.metodo_pago,
+        factura: extracted.factura || prev.factura,
+        notas: extracted.notas || prev.notas,
+      }));
+      const count = Object.values(extracted).filter(Boolean).length;
+      if (count > 0) {
+        showToast(`Se extrajeron ${count} dato${count !== 1 ? 's' : ''} de la imagen. Verifica los campos.`, 'success');
+      } else {
+        showToast('No se pudieron extraer datos claros. Ingresa manualmente.', 'error');
+      }
+    } catch {
+      showToast('Error al analizar la imagen', 'error');
+    } finally {
+      setOcrProcessing(false);
+      if (ocrInputRef.current) ocrInputRef.current.value = '';
+    }
+  };
 
   const fetchIngresos = useCallback(async () => {
     setLoading(true);
@@ -627,6 +727,48 @@ export default function IngresosPage() {
         size="lg"
       >
         <div className="space-y-4">
+          {/* OCR Upload — only for new ingresos */}
+          {!editingIngreso && (
+            <div className="rounded-xl border-2 border-dashed border-[#16a34a]/30 bg-[#16a34a]/5 p-4">
+              <input
+                ref={ocrInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleOcrUpload}
+              />
+              <button
+                type="button"
+                onClick={() => ocrInputRef.current?.click()}
+                disabled={ocrProcessing}
+                className="flex w-full flex-col items-center gap-2 text-center"
+              >
+                {ocrProcessing ? (
+                  <>
+                    <svg className="h-8 w-8 animate-spin text-[#16a34a]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-sm font-medium text-[#16a34a]">Analizando imagen...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Camera size={22} className="text-[#16a34a]" />
+                      <Upload size={18} className="text-[#16a34a]/60" />
+                    </div>
+                    <span className="text-sm font-medium text-[#16a34a]">
+                      Subir foto de factura / CFDI
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      Se extraerán los datos automáticamente
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Concepto <span className="text-red-500">*</span>
