@@ -14,6 +14,7 @@ import Modal from '@/components/Modal';
 interface FacturaForm {
   fecha: string;
   documento: string;
+  cliente: string;
   descripcion: string;
   folio_fiscal: string;
   subtotal: string;
@@ -26,6 +27,7 @@ interface FacturaForm {
 const emptyForm: FacturaForm = {
   fecha: '',
   documento: '',
+  cliente: '',
   descripcion: '',
   folio_fiscal: '',
   subtotal: '',
@@ -83,7 +85,7 @@ function extractCfdiFactura(text: string): Partial<FacturaForm> {
   else if (/CHEQUE/i.test(upper)) result.forma_pago = 'Cheque';
   else if (/TARJETA/i.test(upper)) result.forma_pago = 'Tarjeta';
 
-  // Documento — nombre emisor or receptor
+  // Documento — nombre emisor
   for (const line of lines) {
     if (/nombre\s*emisor/i.test(line) && line.includes(':')) {
       const val = line.split(':').slice(1).join(':').trim();
@@ -94,6 +96,20 @@ function extractCfdiFactura(text: string): Partial<FacturaForm> {
     const emisorMatch = upper.match(/NOMBRE\s*EMISOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
     if (emisorMatch && emisorMatch[1].trim().length > 2) {
       result.documento = emisorMatch[1].trim();
+    }
+  }
+
+  // Cliente — nombre receptor
+  for (const line of lines) {
+    if (/nombre\s*receptor/i.test(line) && line.includes(':')) {
+      const val = line.split(':').slice(1).join(':').trim();
+      if (val.length > 2) { result.cliente = val; break; }
+    }
+  }
+  if (!result.cliente) {
+    const receptorMatch = upper.match(/NOMBRE\s*RECEPTOR[:\s]*([A-ZÁÉÍÓÚÑ\s]+)/);
+    if (receptorMatch && receptorMatch[1].trim().length > 2) {
+      result.cliente = receptorMatch[1].trim();
     }
   }
 
@@ -207,6 +223,7 @@ export default function FacturacionPage() {
     const s = searchTerm.toLowerCase();
     return (
       f.documento.toLowerCase().includes(s) ||
+      (f.cliente?.toLowerCase().includes(s)) ||
       f.descripcion.toLowerCase().includes(s) ||
       (f.folio_fiscal?.toLowerCase().includes(s)) ||
       (f.forma_pago?.toLowerCase().includes(s))
@@ -229,6 +246,7 @@ export default function FacturacionPage() {
     setForm({
       fecha: f.fecha,
       documento: f.documento,
+      cliente: f.cliente ?? '',
       descripcion: f.descripcion,
       folio_fiscal: f.folio_fiscal ?? '',
       subtotal: String(f.subtotal),
@@ -273,6 +291,7 @@ export default function FacturacionPage() {
       setForm((prev) => ({
         fecha: extracted.fecha || prev.fecha,
         documento: extracted.documento || prev.documento,
+        cliente: extracted.cliente || prev.cliente,
         descripcion: extracted.descripcion || prev.descripcion,
         folio_fiscal: extracted.folio_fiscal || prev.folio_fiscal,
         subtotal: extracted.subtotal || prev.subtotal,
@@ -322,6 +341,7 @@ export default function FacturacionPage() {
       const payload = {
         fecha: form.fecha,
         documento: form.documento.trim(),
+        cliente: form.cliente.trim() || null,
         descripcion: form.descripcion.trim(),
         folio_fiscal: form.folio_fiscal.trim() || null,
         subtotal: parseFloat(form.subtotal) || 0,
@@ -401,6 +421,7 @@ export default function FacturacionPage() {
     const headers = [
       { key: 'fecha', label: 'Fecha' },
       { key: 'documento', label: 'Documento' },
+      { key: 'cliente', label: 'Cliente' },
       { key: 'descripcion', label: 'Descripción' },
       { key: 'folio_fiscal', label: 'Folio Fiscal' },
       { key: 'subtotal', label: 'Subtotal' },
@@ -413,6 +434,7 @@ export default function FacturacionPage() {
     const data = filtered.map((f) => ({
       fecha: formatDate(f.fecha),
       documento: f.documento,
+      cliente: f.cliente ?? '',
       descripcion: f.descripcion,
       folio_fiscal: f.folio_fiscal ?? '',
       subtotal: formatCurrency(f.subtotal),
@@ -425,6 +447,7 @@ export default function FacturacionPage() {
     data.push({
       fecha: '',
       documento: '',
+      cliente: '',
       descripcion: 'TOTALES',
       folio_fiscal: '',
       subtotal: formatCurrency(subtotalSum),
@@ -624,6 +647,7 @@ export default function FacturacionPage() {
               <div className="mb-2 flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{f.documento}</p>
+                  {f.cliente && <p className="mt-0.5 text-xs font-medium text-[#1a365d]">{f.cliente}</p>}
                   <p className="mt-0.5 text-xs text-gray-500">{f.descripcion}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-gray-400">{formatDate(f.fecha)}</span>
@@ -677,6 +701,7 @@ export default function FacturacionPage() {
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-3 py-3 font-semibold text-gray-600">Fecha</th>
                 <th className="px-3 py-3 font-semibold text-gray-600">Documento</th>
+                <th className="px-3 py-3 font-semibold text-gray-600">Cliente</th>
                 <th className="px-3 py-3 font-semibold text-gray-600">Descripción</th>
                 <th className="px-3 py-3 font-semibold text-gray-600">Folio Fiscal</th>
                 <th className="px-3 py-3 text-right font-semibold text-gray-600">Subtotal</th>
@@ -691,7 +716,7 @@ export default function FacturacionPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-100">
-                    {Array.from({ length: 10 }).map((_, j) => (
+                    {Array.from({ length: 11 }).map((_, j) => (
                       <td key={j} className="px-3 py-3">
                         <span className="inline-block h-4 w-full max-w-[100px] animate-pulse rounded bg-gray-200" />
                       </td>
@@ -700,7 +725,7 @@ export default function FacturacionPage() {
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={11} className="px-4 py-12 text-center text-gray-400">
                     No se encontraron facturas.
                   </td>
                 </tr>
@@ -710,6 +735,7 @@ export default function FacturacionPage() {
                     <tr key={f.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50">
                       <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDate(f.fecha)}</td>
                       <td className="px-3 py-3 font-medium text-gray-900">{f.documento}</td>
+                      <td className="px-3 py-3 text-gray-600">{f.cliente ?? '-'}</td>
                       <td className="max-w-[200px] truncate px-3 py-3 text-gray-600">{f.descripcion}</td>
                       <td className="max-w-[150px] truncate px-3 py-3 text-xs text-gray-500">
                         {f.folio_fiscal ?? '-'}
@@ -756,7 +782,7 @@ export default function FacturacionPage() {
                   ))}
                   {/* Totals row */}
                   <tr className="border-t-2 border-[#1a365d]/20 bg-gray-50 font-semibold">
-                    <td colSpan={4} className="px-3 py-3 text-right text-gray-700">TOTALES</td>
+                    <td colSpan={5} className="px-3 py-3 text-right text-gray-700">TOTALES</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right text-gray-900">{formatCurrency(subtotalSum)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right text-gray-900">{formatCurrency(ivaSum)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right text-[#16a34a]">{formatCurrency(totalSum)}</td>
@@ -848,6 +874,18 @@ export default function FacturacionPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
+            <input
+              type="text"
+              name="cliente"
+              value={form.cliente}
+              onChange={handleFormChange}
+              placeholder="Nombre del cliente / receptor"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+            />
           </div>
 
           <div>

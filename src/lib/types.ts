@@ -201,6 +201,7 @@ export interface FacturaRO {
   id: string;
   fecha: string;
   documento: string;
+  cliente: string | null;
   descripcion: string;
   folio_fiscal: string | null;
   subtotal: number;
