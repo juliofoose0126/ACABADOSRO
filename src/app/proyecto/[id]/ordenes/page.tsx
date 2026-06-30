@@ -17,6 +17,7 @@ import {
   X,
   Search,
   Check,
+  CheckCircle2,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -526,6 +527,20 @@ export default function OrdenesPage() {
     }
   }
 
+  async function handleQuickStateChange(orden: OrdenCompra, newEstado: OrdenCompra['estado']) {
+    const { error } = await supabase
+      .from('ordenes_compra')
+      .update({ estado: newEstado })
+      .eq('id', orden.id);
+
+    if (error) {
+      addToast('Error al actualizar estado: ' + error.message, 'error');
+    } else {
+      addToast('Orden ' + orden.numero_orden + ' → ' + ESTADO_LABELS[newEstado], 'success');
+      fetchOrdenes();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // View detail
   // ---------------------------------------------------------------------------
@@ -759,12 +774,41 @@ export default function OrdenesPage() {
                     <td className="px-4 py-3 text-gray-600">{orden.obra_proyecto || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(orden.fecha)}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => openEstadoModal(orden)}
-                        className={`inline-block cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${ESTADO_COLORS[orden.estado]}`}
-                      >
-                        {ESTADO_LABELS[orden.estado]}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEstadoModal(orden)}
+                          className={`inline-block cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${ESTADO_COLORS[orden.estado]}`}
+                        >
+                          {ESTADO_LABELS[orden.estado]}
+                        </button>
+                        {orden.estado === 'pendiente' && (
+                          <>
+                            <button
+                              onClick={() => handleQuickStateChange(orden, 'aprobada')}
+                              title="Marcar como Aprobada"
+                              className="rounded p-1 text-green-600 transition-colors hover:bg-green-50"
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleQuickStateChange(orden, 'recibida')}
+                              title="Marcar como Recibida"
+                              className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-50"
+                            >
+                              <CheckCircle2 size={16} />
+                            </button>
+                          </>
+                        )}
+                        {orden.estado === 'aprobada' && (
+                          <button
+                            onClick={() => handleQuickStateChange(orden, 'recibida')}
+                            title="Marcar como Recibida"
+                            className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-50"
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-gray-900">{formatCurrency(orden.total)}</td>
                     <td className="px-4 py-3">
