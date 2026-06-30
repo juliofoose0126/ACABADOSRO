@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OrdenCompra, OrdenDetalle, Material, Proveedor } from '@/lib/types';
 import { exportOCExcel, exportOCPDF, formatCurrency, formatDate, formatDateShort, type OCExportData } from '@/lib/export-utils';
@@ -165,6 +165,7 @@ function generateFolio(num: number): string {
 
 export default function OrdenesPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.id as string;
 
   // --- data ---
@@ -639,13 +640,22 @@ export default function OrdenesPage() {
           </div>
         </div>
 
-        <button
-          onClick={openCreateForm}
-          className="btn-primary flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
-        >
-          <Plus size={18} />
-          Nueva Orden
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => router.push(`/proyecto/${projectId}/generar-orden`)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#D4A520] px-4 py-2.5 text-sm font-medium text-[#D4A520] transition-colors hover:bg-[#D4A520]/5"
+          >
+            <FileText size={18} />
+            Desde Cotización
+          </button>
+          <button
+            onClick={openCreateForm}
+            className="btn-primary flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
+          >
+            <Plus size={18} />
+            Nueva Orden
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
