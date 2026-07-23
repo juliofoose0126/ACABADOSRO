@@ -439,7 +439,7 @@ export default function ProjectDashboardPage() {
             <button
               key={card.label}
               onClick={() => router.push(card.href)}
-              className={`card-hover animate-fade-in stagger-${idx + 1} group relative overflow-hidden rounded-xl bg-white p-5 text-left shadow-sm ring-1 ring-gray-100`}
+              className={`card-modern animate-slide-in-up stagger-${idx + 1} group relative overflow-hidden p-5 text-left`}
               style={{ opacity: 0 }}
             >
               <div className={`absolute right-0 top-0 h-full w-1 bg-gradient-to-b ${card.color}`} />
@@ -515,19 +515,19 @@ export default function ProjectDashboardPage() {
 
         {/* Financial Summary Cards */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border-l-4 border-l-[#16a34a] bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div className="rounded-xl border-l-4 border-l-[#16a34a] card-modern bg-white p-5">
             <p className="text-xs font-medium text-gray-500">Ingresos {reportYear}</p>
             <p className="mt-1 text-2xl font-bold text-[#16a34a]">
               {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : fmtMoney(totalIngresosYear)}
             </p>
           </div>
-          <div className="rounded-xl border-l-4 border-l-[#8B1A1A] bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div className="rounded-xl border-l-4 border-l-[#8B1A1A] card-modern bg-white p-5">
             <p className="text-xs font-medium text-gray-500">Gastos {reportYear}</p>
             <p className="mt-1 text-2xl font-bold text-[#8B1A1A]">
               {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : fmtMoney(totalGastosYear)}
             </p>
           </div>
-          <div className={`rounded-xl border-l-4 ${balanceYear >= 0 ? 'border-l-[#16a34a]' : 'border-l-[#dc2626]'} bg-white p-5 shadow-sm ring-1 ring-gray-100`}>
+          <div className={`rounded-xl border-l-4 ${balanceYear >= 0 ? 'border-l-[#16a34a]' : 'border-l-[#dc2626]'} card-modern bg-white p-5`}>
             <p className="text-xs font-medium text-gray-500">Balance {reportYear}</p>
             <p className={`mt-1 text-2xl font-bold ${balanceYear >= 0 ? 'text-[#16a34a]' : 'text-[#dc2626]'}`}>
               {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : fmtMoney(balanceYear)}
@@ -538,7 +538,7 @@ export default function ProjectDashboardPage() {
               </p>
             )}
           </div>
-          <div className="rounded-xl border-l-4 border-l-[#D4A520] bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div className="rounded-xl border-l-4 border-l-[#D4A520] card-modern bg-white p-5">
             <p className="text-xs font-medium text-gray-500">Margen</p>
             <p className="mt-1 text-2xl font-bold text-[#D4A520]">
               {loadingReport ? <span className="inline-block h-7 w-16 animate-pulse rounded bg-gray-200" /> : `${margenPct.toFixed(1)}%`}
@@ -552,7 +552,7 @@ export default function ProjectDashboardPage() {
         {/* Charts Row */}
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Bar Chart: Ingresos vs Gastos Mensual */}
-          <div className="col-span-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 lg:col-span-2">
+          <div className="col-span-1 rounded-xl card-modern bg-white p-5 lg:col-span-2">
             <div className="mb-4 flex items-center gap-2">
               <BarChart3 size={18} className="text-[#1a365d]" />
               <h3 className="text-sm font-semibold text-gray-700">Ingresos vs Gastos Mensual — {reportYear}</h3>
@@ -579,7 +579,7 @@ export default function ProjectDashboardPage() {
           </div>
 
           {/* Pie Chart: Gastos por Categoría */}
-          <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+          <div className="rounded-xl card-modern bg-white p-5">
             <div className="mb-4 flex items-center gap-2">
               <PieChartIcon size={18} className="text-[#1a365d]" />
               <h3 className="text-sm font-semibold text-gray-700">Distribución de Gastos</h3>
@@ -634,7 +634,7 @@ export default function ProjectDashboardPage() {
         </div>
 
         {/* Balance Mensual Table */}
-        <div className="mb-6 rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
+        <div className="mb-6 card-modern bg-white">
           <div className="border-b border-gray-100 px-5 py-4">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
               <DollarSign size={16} className="text-[#1a365d]" />
@@ -701,7 +701,7 @@ export default function ProjectDashboardPage() {
 
         {/* Top Inventario */}
         {inventario.length > 0 && !loadingReport && (
-          <div className="rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
+          <div className="card-modern bg-white">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                 <Package size={16} className="text-[#1a365d]" />
@@ -750,7 +750,7 @@ export default function ProjectDashboardPage() {
               <button
                 key={action.label}
                 onClick={() => router.push(action.href)}
-                className="card-hover flex flex-col items-center gap-3 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100"
+                className="card-modern flex flex-col items-center gap-3 bg-white p-5"
               >
                 <div className="rounded-xl bg-[#1a365d]/5 p-3">
                   <Icon size={22} className="text-[#1a365d]" />

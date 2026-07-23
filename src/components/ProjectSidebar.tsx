@@ -139,10 +139,10 @@ export default function ProjectSidebar({ projectId, projectName }: Props) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setIsOpen(false)}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-white/15 text-white shadow-sm'
-                    : 'text-white/60 hover:bg-white/8 hover:text-white'
+                    ? 'bg-gradient-to-r from-white/15 to-white/5 text-white shadow-sm ring-1 ring-white/10'
+                    : 'text-white/60 hover:translate-x-0.5 hover:bg-white/8 hover:text-white'
                 }`}
               >
                 <div className={`rounded-md p-1 transition-colors ${
@@ -162,7 +162,7 @@ export default function ProjectSidebar({ projectId, projectName }: Props) {
         {/* User section */}
         <div className="border-t border-white/10 px-4 py-4">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D4A520]/20 text-xs font-bold text-[#D4A520]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#D4A520] to-[#E8B82E] text-xs font-bold text-[#1a365d] shadow-sm">
               {(userName || userEmail).charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
