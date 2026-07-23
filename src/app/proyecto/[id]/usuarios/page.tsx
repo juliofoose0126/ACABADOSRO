@@ -181,10 +181,10 @@ export default function UsuariosPage() {
       )}
 
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-[#1a365d]/10 p-2.5">
-            <Users size={24} className="text-[#1a365d]" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
+            <Users className="text-white" size={24} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
@@ -195,7 +195,7 @@ export default function UsuariosPage() {
         </div>
         <button
           onClick={openAddModal}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+          className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white"
         >
           <Plus size={18} />
           Agregar Usuario
@@ -223,7 +223,7 @@ export default function UsuariosPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="animate-pulse rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100"
+              className="card-modern animate-pulse bg-white p-6"
             >
               <div className="mb-4 h-5 w-3/4 rounded bg-gray-200" />
               <div className="space-y-3">
@@ -234,7 +234,7 @@ export default function UsuariosPage() {
           ))}
         </div>
       ) : filteredUsuarios.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern flex flex-col items-center justify-center bg-white py-16">
           <Users size={48} className="mb-3 text-gray-300" />
           <p className="text-sm text-gray-500">
             {search
@@ -244,7 +244,7 @@ export default function UsuariosPage() {
           {!search && (
             <button
               onClick={openAddModal}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+              className="btn-primary mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
             >
               <Plus size={16} />
               Agregar primer usuario
@@ -253,17 +253,16 @@ export default function UsuariosPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredUsuarios.map((usuario) => (
+          {filteredUsuarios.map((usuario, idx) => (
             <div
               key={usuario.id}
-              className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md"
+              className="card-modern animate-slide-in-up bg-white p-5"
+              style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
             >
               <div className="mb-4 flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white ${
-                      usuario.rol === 'admin' ? 'bg-[#1a365d]' : 'bg-gray-400'
-                    }`}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#D4A520] to-[#E8B82E] text-sm font-bold text-[#1a365d] shadow-sm"
                   >
                     {(usuario.nombre || usuario.email).charAt(0).toUpperCase()}
                   </div>
@@ -272,9 +271,9 @@ export default function UsuariosPage() {
                       {usuario.nombre || 'Sin nombre'}
                     </h3>
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm ${
                         usuario.rol === 'admin'
-                          ? 'bg-[#1a365d]/10 text-[#1a365d]'
+                          ? 'badge-info'
                           : 'bg-gray-100 text-gray-600'
                       }`}
                     >
@@ -298,7 +297,7 @@ export default function UsuariosPage() {
                 )}
               </div>
 
-              <div className="space-y-2.5 text-sm text-gray-600">
+              <div className="space-y-2.5 border-t border-gray-100 pt-3 text-sm text-gray-600">
                 <div className="flex items-center gap-2.5">
                   <Mail size={15} className="shrink-0 text-gray-400" />
                   <span className="truncate">{usuario.email}</span>
@@ -306,10 +305,10 @@ export default function UsuariosPage() {
                 <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>Creado: {formatDate(usuario.created_at)}</span>
                   <span
-                    className={`inline-flex rounded-full px-2 py-0.5 font-medium ${
+                    className={`inline-flex rounded-full px-2 py-0.5 font-semibold shadow-sm ${
                       usuario.activo
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-red-50 text-red-700'
+                        ? 'badge-success'
+                        : 'badge-danger'
                     }`}
                   >
                     {usuario.activo ? 'Activo' : 'Inactivo'}
@@ -411,14 +410,14 @@ export default function UsuariosPage() {
                 setShowModal(false);
                 setFormData(emptyForm);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+              className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {saving ? 'Creando...' : 'Crear Usuario'}
             </button>
@@ -451,14 +450,14 @@ export default function UsuariosPage() {
                 setShowDeleteModal(false);
                 setDeletingUser(null);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleDelete}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              className="btn-danger inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Eliminando...' : 'Eliminar'}
             </button>

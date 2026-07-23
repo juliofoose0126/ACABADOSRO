@@ -547,16 +547,16 @@ export default function GenerarOrdenPage() {
 
       {/* Totals */}
       {form.items.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-lg bg-white p-4 ring-1 ring-gray-100">
+        <div className="mb-6 grid animate-slide-in-up grid-cols-1 gap-4 sm:grid-cols-3" style={{ opacity: 0 }}>
+          <div className="card-modern border-l-4 border-l-gray-300 p-4">
             <p className="text-xs font-medium text-gray-500">Subtotal</p>
             <p className="mt-1 text-lg font-bold text-gray-900">${totalSum.toFixed(2)}</p>
           </div>
-          <div className="rounded-lg bg-white p-4 ring-1 ring-gray-100">
+          <div className="card-modern border-l-4 border-l-[#D4A520] p-4">
             <p className="text-xs font-medium text-gray-500">IVA (16%)</p>
             <p className="mt-1 text-lg font-bold text-gray-900">${ivaSum.toFixed(2)}</p>
           </div>
-          <div className="rounded-lg bg-white p-4 ring-1 ring-gray-100">
+          <div className="card-modern border-l-4 border-l-[#16a34a] p-4">
             <p className="text-xs font-medium text-gray-500">Total</p>
             <p className="mt-1 text-lg font-bold text-[#16a34a]">${grandTotal.toFixed(2)}</p>
           </div>
@@ -564,17 +564,17 @@ export default function GenerarOrdenPage() {
       )}
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="flex animate-fade-in gap-3" style={{ opacity: 0 }}>
         <button
           onClick={() => router.back()}
-          className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          className="btn-secondary rounded-lg px-4 py-2.5 text-sm"
         >
           Cancelar
         </button>
         <button
           onClick={handleSave}
           disabled={processing || form.items.length === 0}
-          className="rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+          className="btn-primary rounded-lg px-4 py-2.5 text-sm"
         >
           {processing ? 'Guardando...' : 'Crear Orden de Compra'}
         </button>

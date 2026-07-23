@@ -317,7 +317,7 @@ export default function DocumentosROPage() {
               Sube o descarga los documentos del mes. Cada tipo acepta un archivo.
             </p>
 
-            {(Object.keys(TIPOS_DOC_RO) as TipoDocRO[]).map((tipo) => {
+            {(Object.keys(TIPOS_DOC_RO) as TipoDocRO[]).map((tipo, idx) => {
               const doc = getDocForType(tipo);
               const isUploading = uploading === tipo;
               const isDeleting = deleting === doc?.id;
@@ -325,12 +325,13 @@ export default function DocumentosROPage() {
               return (
                 <div
                   key={tipo}
-                  className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center ${
+                  style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
+                  className={`flex animate-slide-in-up flex-col gap-3 rounded-xl border p-4 shadow-sm transition-all sm:flex-row sm:items-center ${
                     doc ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50/50'
                   }`}
                 >
                   <div className="flex flex-1 items-center gap-3">
-                    <span className="text-2xl">{DOC_ICONS[tipo]}</span>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-xl shadow-sm ring-1 ring-gray-100">{DOC_ICONS[tipo]}</span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-[#1a365d]">
                         {TIPOS_DOC_RO[tipo]}
@@ -341,7 +342,7 @@ export default function DocumentosROPage() {
                           {doc.nombre_archivo}
                         </p>
                       ) : (
-                        <p className="text-xs text-gray-400">Sin archivo</p>
+                        <span className="badge-warning mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold">Sin archivo</span>
                       )}
                     </div>
                   </div>
@@ -351,7 +352,7 @@ export default function DocumentosROPage() {
                       <>
                         <button
                           onClick={() => handleDownload(doc)}
-                          className="flex items-center gap-1.5 rounded-lg bg-[#1a365d] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#1a365d]/90"
+                          className="btn-primary flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-white"
                         >
                           <Download size={14} />
                           <span className="hidden sm:inline">Descargar</span>
@@ -359,7 +360,7 @@ export default function DocumentosROPage() {
                         <button
                           onClick={() => handleDelete(doc)}
                           disabled={!!isDeleting}
-                          className="rounded-lg border border-red-200 p-2 text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+                          className="btn-danger rounded-lg p-2 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isDeleting ? (
                             <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -374,10 +375,10 @@ export default function DocumentosROPage() {
                     )}
 
                     <label
-                      className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                      className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
                         doc
-                          ? 'border border-[#D4A520] text-[#D4A520] hover:bg-[#D4A520]/10'
-                          : 'bg-[#D4A520] text-white hover:bg-[#D4A520]/90'
+                          ? 'border border-[#D4A520] text-[#D4A520] hover:-translate-y-0.5 hover:bg-[#D4A520]/10'
+                          : 'btn-gold'
                       } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
                     >
                       {isUploading ? (

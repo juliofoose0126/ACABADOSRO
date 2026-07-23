@@ -40,6 +40,12 @@ const emptyForm: FacturaForm = {
 const TIPOS_DOCUMENTO = ['FACTURA', 'COMPLEMENTO', 'NC'] as const;
 const FORMAS_PAGO = ['CREDITO', 'DEBITO', 'TRANSFERENCIA', 'EFECTIVO'] as const;
 
+const DOCUMENTO_BADGE: Record<string, string> = {
+  FACTURA: 'badge-success',
+  COMPLEMENTO: 'badge-info',
+  NC: 'badge-danger',
+};
+
 function findValueNearLabel(lines: string[], labelPattern: RegExp, maxDistance = 3): string | null {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -788,7 +794,7 @@ export default function FacturacionPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+            className={`animate-slide-in-right flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
               t.type === 'success' ? 'bg-green-600' : 'bg-red-600'
             }`}
           >
@@ -802,12 +808,17 @@ export default function FacturacionPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-[#1a365d] sm:text-2xl">Facturación RO</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Sube facturas, se analizan automáticamente y genera reportes en Excel
-          </p>
+      <div className="mb-6 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
+            <FileText className="text-white" size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Facturación RO</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Sube facturas, se analizan automáticamente y genera reportes en Excel
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
@@ -819,7 +830,7 @@ export default function FacturacionPage() {
           </button>
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+            className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Plus size={16} />
             Agregar Factura
@@ -828,7 +839,7 @@ export default function FacturacionPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-6 card-modern rounded-xl bg-white p-4">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-500">
@@ -873,19 +884,19 @@ export default function FacturacionPage() {
 
       {/* Summary Cards */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border-l-4 border-l-blue-500 bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern animate-slide-in-up stagger-1 rounded-xl border-l-4 border-l-blue-500 bg-white p-4" style={{ opacity: 0 }}>
           <p className="text-xs font-medium text-gray-500">Subtotal</p>
           <p className="mt-1 text-lg font-bold text-gray-900">
             {loading ? <span className="inline-block h-6 w-24 animate-pulse rounded bg-gray-200" /> : formatCurrency(subtotalSum)}
           </p>
         </div>
-        <div className="rounded-xl border-l-4 border-l-amber-500 bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern animate-slide-in-up stagger-2 rounded-xl border-l-4 border-l-amber-500 bg-white p-4" style={{ opacity: 0 }}>
           <p className="text-xs font-medium text-gray-500">IVA</p>
           <p className="mt-1 text-lg font-bold text-gray-900">
             {loading ? <span className="inline-block h-6 w-24 animate-pulse rounded bg-gray-200" /> : formatCurrency(ivaSum)}
           </p>
         </div>
-        <div className="rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern animate-slide-in-up stagger-3 rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4" style={{ opacity: 0 }}>
           <p className="text-xs font-medium text-gray-500">Total</p>
           <p className="mt-1 text-lg font-bold text-[#16a34a]">
             {loading ? <span className="inline-block h-6 w-24 animate-pulse rounded bg-gray-200" /> : formatCurrency(totalSum)}
@@ -898,27 +909,33 @@ export default function FacturacionPage() {
       <div className="space-y-3 md:hidden">
         {loading ? (
           [1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <div key={i} className="animate-pulse card-modern rounded-xl bg-white p-4">
               <div className="mb-2 h-4 w-3/4 rounded bg-gray-200" />
               <div className="h-4 w-1/2 rounded bg-gray-200" />
             </div>
           ))
         ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-sm text-gray-400 shadow-sm ring-1 ring-gray-100">
+          <div className="flex items-center justify-center card-modern rounded-xl bg-white py-12 text-sm text-gray-400">
             No se encontraron facturas.
           </div>
         ) : (
-          filtered.map((f) => (
-            <div key={f.id} className="rounded-xl border-l-4 border-l-[#1a365d] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          filtered.map((f, idx) => (
+            <div
+              key={f.id}
+              className="card-modern animate-slide-in-up rounded-xl border-l-4 border-l-[#1a365d] bg-white p-4"
+              style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
+            >
               <div className="mb-2 flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-900">{f.documento}</p>
-                  {f.cliente && <p className="mt-0.5 text-xs font-medium text-[#1a365d]">{f.cliente}</p>}
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${DOCUMENTO_BADGE[f.documento] || 'badge-info'}`}>
+                    {f.documento}
+                  </span>
+                  {f.cliente && <p className="mt-1 text-xs font-medium text-[#1a365d]">{f.cliente}</p>}
                   <p className="mt-0.5 text-xs text-gray-500">{f.descripcion}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-gray-400">{formatDate(f.fecha)}</span>
                     {f.forma_pago && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                      <span className="badge-info rounded-full px-2.5 py-0.5 text-xs font-semibold">
                         {f.forma_pago}
                       </span>
                     )}
@@ -960,7 +977,7 @@ export default function FacturacionPage() {
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
+      <div className="hidden overflow-hidden card-modern rounded-xl bg-white md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -1000,7 +1017,11 @@ export default function FacturacionPage() {
                   {filtered.map((f) => (
                     <tr key={f.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50">
                       <td className="whitespace-nowrap px-3 py-3 text-gray-700">{formatDate(f.fecha)}</td>
-                      <td className="px-3 py-3 font-medium text-gray-900">{f.documento}</td>
+                      <td className="px-3 py-3">
+                        <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${DOCUMENTO_BADGE[f.documento] || 'badge-info'}`}>
+                          {f.documento}
+                        </span>
+                      </td>
                       <td className="px-3 py-3 text-gray-600">{f.cliente ?? '-'}</td>
                       <td className="max-w-[200px] truncate px-3 py-3 text-gray-600">{f.descripcion}</td>
                       <td className="max-w-[150px] truncate px-3 py-3 text-xs text-gray-500">
@@ -1015,7 +1036,15 @@ export default function FacturacionPage() {
                       <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-[#16a34a]">
                         {formatCurrency(f.total)}
                       </td>
-                      <td className="px-3 py-3 text-gray-600">{f.forma_pago ?? '-'}</td>
+                      <td className="px-3 py-3">
+                        {f.forma_pago ? (
+                          <span className="badge-info inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                            {f.forma_pago}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="max-w-[120px] truncate px-3 py-3 text-gray-500">{f.cuenta ?? '-'}</td>
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1">
@@ -1047,7 +1076,7 @@ export default function FacturacionPage() {
                     </tr>
                   ))}
                   {/* Totals row */}
-                  <tr className="border-t-2 border-[#1a365d]/20 bg-gray-50 font-semibold">
+                  <tr className="border-t-2 border-[#1a365d] bg-gray-50 font-semibold">
                     <td colSpan={5} className="px-3 py-3 text-right text-gray-700">TOTALES</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right text-gray-900">{formatCurrency(subtotalSum)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right text-gray-900">{formatCurrency(ivaSum)}</td>
@@ -1070,7 +1099,7 @@ export default function FacturacionPage() {
       >
         <div className="space-y-4">
           {/* OCR Upload */}
-          <div className="rounded-xl border-2 border-dashed border-[#D4A520]/40 bg-[#D4A520]/5 p-4">
+          <div className="rounded-xl border-2 border-dashed border-[#D4A520]/40 bg-[#D4A520]/5 p-4 transition-colors hover:border-[#D4A520]/60 hover:bg-[#D4A520]/10">
             <input
               ref={ocrInputRef}
               type="file"
@@ -1274,7 +1303,7 @@ export default function FacturacionPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+              className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Guardando...' : editingFactura ? 'Actualizar' : 'Guardar'}
             </button>

@@ -907,14 +907,14 @@ export default function GastosPage() {
                 setEditingGasto(null);
                 setForm(emptyForm);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+              className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Guardando...' : editingGasto ? 'Actualizar' : 'Guardar'}
             </button>
@@ -950,14 +950,14 @@ export default function GastosPage() {
                 setShowDeleteModal(false);
                 setDeletingGasto(null);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              className="btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </button>

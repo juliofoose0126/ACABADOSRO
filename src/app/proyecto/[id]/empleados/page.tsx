@@ -500,8 +500,8 @@ export default function EmpleadosPage() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`animate-slide-in rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            className={`animate-slide-in-right rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+              toast.type === 'success' ? 'badge-success' : 'badge-danger'
             }`}
           >
             {toast.message}
@@ -510,17 +510,22 @@ export default function EmpleadosPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Altas, bajas y documentación de trabajadores
-          </p>
+      <div className="mb-6 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
+            <HardHat className="text-white" size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Altas, bajas y documentación de trabajadores
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#1a365d] px-4 py-2.5 text-sm font-medium text-[#1a365d] transition-colors hover:bg-[#1a365d]/5"
+            className="btn-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Download size={16} />
             Exportar Excel
@@ -528,7 +533,7 @@ export default function EmpleadosPage() {
           {!selectionMode && (
             <button
               onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#8B1A1A] px-4 py-2.5 text-sm font-medium text-[#8B1A1A] transition-colors hover:bg-[#8B1A1A]/5"
+              className="inline-flex items-center gap-2 rounded-lg border border-[#8B1A1A] px-4 py-2.5 text-sm font-medium text-[#8B1A1A] transition-all hover:-translate-y-0.5 hover:bg-[#8B1A1A]/5 hover:shadow-md"
             >
               <UserX size={16} />
               Dar de Baja
@@ -536,7 +541,7 @@ export default function EmpleadosPage() {
           )}
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+            className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Plus size={16} />
             Alta de Empleado
@@ -546,22 +551,22 @@ export default function EmpleadosPage() {
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern animate-slide-in-up stagger-1 rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4" style={{ opacity: 0 }}>
           <p className="text-xs font-medium text-gray-500">Activos</p>
           <p className="mt-1 text-2xl font-bold text-[#16a34a]">{activosCount}</p>
         </div>
-        <div className="rounded-xl border-l-4 border-l-[#8B1A1A] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern animate-slide-in-up stagger-2 rounded-xl border-l-4 border-l-[#8B1A1A] bg-white p-4" style={{ opacity: 0 }}>
           <p className="text-xs font-medium text-gray-500">Bajas</p>
           <p className="mt-1 text-2xl font-bold text-[#8B1A1A]">{bajasCount}</p>
         </div>
-        <div className="rounded-xl border-l-4 border-l-[#1a365d] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern animate-slide-in-up stagger-3 rounded-xl border-l-4 border-l-[#1a365d] bg-white p-4" style={{ opacity: 0 }}>
           <p className="text-xs font-medium text-gray-500">Total</p>
           <p className="mt-1 text-2xl font-bold text-[#1a365d]">{empleados.length}</p>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="mb-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="card-modern mb-6 bg-white p-4">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-500">
@@ -593,7 +598,7 @@ export default function EmpleadosPage() {
 
       {/* Bulk Baja Bar */}
       {selectionMode && (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-[#8B1A1A]/20 bg-[#8B1A1A]/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="animate-fade-in mb-4 flex flex-col gap-3 rounded-xl border border-[#8B1A1A]/20 bg-[#8B1A1A]/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-medium text-[#8B1A1A]">
             {selectedIds.size > 0
               ? `${selectedIds.size} empleado${selectedIds.size !== 1 ? 's' : ''} seleccionado${selectedIds.size !== 1 ? 's' : ''}`
@@ -602,7 +607,7 @@ export default function EmpleadosPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100"
             >
               Cancelar
             </button>
@@ -612,7 +617,7 @@ export default function EmpleadosPage() {
                 setShowBulkBajaModal(true);
               }}
               disabled={selectedIds.size === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#8B1A1A] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#A52222] disabled:opacity-40"
+              className="btn-danger inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-medium disabled:opacity-40"
             >
               <MessageCircle size={14} />
               Dar de Baja y Notificar por WhatsApp
@@ -625,22 +630,23 @@ export default function EmpleadosPage() {
       <div className="space-y-3 md:hidden">
         {loading ? (
           [1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <div key={i} className="card-modern animate-pulse bg-white p-4">
               <div className="mb-2 h-4 w-3/4 rounded bg-gray-200" />
               <div className="h-4 w-1/2 rounded bg-gray-200" />
             </div>
           ))
         ) : filteredEmpleados.length === 0 ? (
-          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-sm text-gray-400 shadow-sm ring-1 ring-gray-100">
+          <div className="card-modern flex items-center justify-center bg-white py-12 text-sm text-gray-400">
             No se encontraron empleados.
           </div>
         ) : (
-          filteredEmpleados.map((emp) => (
+          filteredEmpleados.map((emp, idx) => (
             <div
               key={emp.id}
-              className={`rounded-xl border-l-4 ${
+              className={`card-modern animate-slide-in-up rounded-xl border-l-4 ${
                 emp.estado === 'activo' ? 'border-l-[#16a34a]' : 'border-l-[#8B1A1A]'
-              } bg-white p-4 shadow-sm ring-1 ring-gray-100`}
+              } bg-white p-4`}
+              style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
             >
               <div className="mb-2 flex items-start gap-3">
                 {selectionMode && emp.estado === 'activo' && (
@@ -657,10 +663,8 @@ export default function EmpleadosPage() {
                   <p className="mt-0.5 text-xs text-gray-500">{emp.puesto}</p>
                   {emp.curp && <p className="mt-0.5 font-mono text-xs text-gray-400">{emp.curp}</p>}
                   <div className="mt-1 flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      emp.estado === 'activo'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm ${
+                      emp.estado === 'activo' ? 'badge-success' : 'badge-danger'
                     }`}>
                       {emp.estado === 'activo' ? 'Activo' : 'Baja'}
                     </span>
@@ -672,22 +676,22 @@ export default function EmpleadosPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-1 border-t border-gray-100 pt-2">
-                <button onClick={() => openDocsModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#1a365d] active:bg-gray-100">
+                <button onClick={() => openDocsModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#1a365d] transition-colors active:bg-gray-100">
                   Documentos
                 </button>
-                <button onClick={() => openEditModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#1a365d] active:bg-gray-100">
+                <button onClick={() => openEditModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#1a365d] transition-colors active:bg-gray-100">
                   Editar
                 </button>
                 {emp.estado === 'activo' ? (
-                  <button onClick={() => openBajaModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#8B1A1A] active:bg-red-50">
+                  <button onClick={() => openBajaModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#8B1A1A] transition-colors active:bg-red-50">
                     Dar Baja
                   </button>
                 ) : (
-                  <button onClick={() => handleReactivar(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#16a34a] active:bg-green-50">
+                  <button onClick={() => handleReactivar(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#16a34a] transition-colors active:bg-green-50">
                     Reactivar
                   </button>
                 )}
-                <button onClick={() => openDeleteModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 active:bg-red-50">
+                <button onClick={() => openDeleteModal(emp)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors active:bg-red-50">
                   Eliminar
                 </button>
               </div>
@@ -697,7 +701,7 @@ export default function EmpleadosPage() {
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
+      <div className="card-modern hidden overflow-hidden bg-white md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -775,10 +779,8 @@ export default function EmpleadosPage() {
                       {emp.curp || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        emp.estado === 'activo'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${
+                        emp.estado === 'activo' ? 'badge-success' : 'badge-danger'
                       }`}>
                         {emp.estado === 'activo' ? 'Activo' : 'Baja'}
                       </span>
@@ -889,14 +891,14 @@ export default function EmpleadosPage() {
           <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
             <button
               onClick={() => { setShowFormModal(false); setEditingEmpleado(null); setForm(emptyForm); }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+              className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Guardando...' : editingEmpleado ? 'Actualizar' : 'Dar de Alta'}
             </button>
@@ -922,11 +924,11 @@ export default function EmpleadosPage() {
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <button onClick={() => { setShowBajaModal(false); setBajaEmpleado(null); }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium">
               Cancelar
             </button>
             <button onClick={handleBaja} disabled={saving}
-              className="rounded-lg bg-[#8B1A1A] px-4 py-2 text-sm font-medium text-white hover:bg-[#A52222] disabled:opacity-50">
+              className="btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
               {saving ? 'Procesando...' : 'Confirmar Baja'}
             </button>
           </div>
@@ -967,11 +969,11 @@ export default function EmpleadosPage() {
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <button onClick={() => setShowBulkBajaModal(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium">
               Cancelar
             </button>
             <button onClick={handleBulkBaja} disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#8B1A1A] px-4 py-2 text-sm font-medium text-white hover:bg-[#A52222] disabled:opacity-50">
+              className="btn-danger inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
               <MessageCircle size={16} />
               {saving ? 'Procesando...' : 'Confirmar Bajas y Enviar WhatsApp'}
             </button>
@@ -993,11 +995,11 @@ export default function EmpleadosPage() {
           </p>
           <div className="mt-6 flex justify-end gap-3">
             <button onClick={() => { setShowDeleteModal(false); setDeletingEmpleado(null); }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium">
               Cancelar
             </button>
             <button onClick={handleDelete} disabled={deleting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+              className="btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </button>
           </div>
@@ -1041,22 +1043,26 @@ export default function EmpleadosPage() {
           {loadingDocs ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-100" />
+                <div key={i} className="skeleton h-16 rounded-lg" />
               ))}
             </div>
           ) : (
             <div className="space-y-3">
-              {(Object.keys(TIPOS_DOCUMENTO) as TipoDocEmpleado[]).map((tipo) => {
+              {(Object.keys(TIPOS_DOCUMENTO) as TipoDocEmpleado[]).map((tipo, idx) => {
                 const docs = getDocForTipo(tipo);
                 const isUploading = uploading === tipo;
 
                 return (
-                  <div key={tipo} className="rounded-lg border border-gray-200 p-3">
+                  <div
+                    key={tipo}
+                    className="card-modern animate-slide-in-up bg-white p-3"
+                    style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
+                  >
                     <div className="mb-2 flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-gray-800">
                         {TIPOS_DOCUMENTO[tipo]}
                         {tipo === 'curp' && (
-                          <span className="ml-2 text-xs font-normal text-blue-500">
+                          <span className="badge-info ml-2 rounded-full px-2 py-0.5 text-xs font-normal">
                             (sube foto para leer automáticamente)
                           </span>
                         )}
@@ -1064,7 +1070,7 @@ export default function EmpleadosPage() {
                       <button
                         onClick={() => handleUploadClick(tipo)}
                         disabled={isUploading}
-                        className="inline-flex items-center gap-1 rounded-md bg-[#1a365d] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+                        className="btn-primary inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50"
                       >
                         {isUploading ? (
                           <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1083,16 +1089,16 @@ export default function EmpleadosPage() {
                     ) : (
                       <div className="space-y-1.5">
                         {docs.map((doc) => (
-                          <div key={doc.id} className="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2">
+                          <div key={doc.id} className="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2 transition-colors hover:bg-gray-100">
                             <FileText size={14} className="shrink-0 text-[#1a365d]" />
                             <span className="flex-1 truncate text-xs text-gray-700">{doc.nombre_archivo}</span>
-                            <button onClick={() => handleViewDoc(doc)} className="rounded p-1 text-gray-400 hover:text-blue-600" title="Ver">
+                            <button onClick={() => handleViewDoc(doc)} className="rounded p-1 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600" title="Ver">
                               <Eye size={14} />
                             </button>
-                            <button onClick={() => handleDownloadDoc(doc)} className="rounded p-1 text-gray-400 hover:text-green-600" title="Descargar">
+                            <button onClick={() => handleDownloadDoc(doc)} className="rounded p-1 text-gray-400 transition-colors hover:bg-green-50 hover:text-green-600" title="Descargar">
                               <Download size={14} />
                             </button>
-                            <button onClick={() => handleDeleteDoc(doc)} className="rounded p-1 text-gray-400 hover:text-red-600" title="Eliminar">
+                            <button onClick={() => handleDeleteDoc(doc)} className="rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600" title="Eliminar">
                               <X size={14} />
                             </button>
                           </div>

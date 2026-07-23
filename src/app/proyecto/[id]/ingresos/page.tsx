@@ -8,11 +8,11 @@ import { Ingreso, MetodoPago, MESES, METODOS_PAGO } from '@/lib/types';
 import { exportMultiSheetExcel, formatCurrency, formatDate } from '@/lib/export-utils';
 import Modal from '@/components/Modal';
 
-const METODO_COLORS: Record<MetodoPago, { border: string; bg: string; text: string }> = {
-  transferencia: { border: 'border-l-blue-500', bg: 'bg-blue-100', text: 'text-blue-800' },
-  efectivo: { border: 'border-l-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800' },
-  cheque: { border: 'border-l-amber-500', bg: 'bg-amber-100', text: 'text-amber-800' },
-  otro: { border: 'border-l-purple-500', bg: 'bg-purple-100', text: 'text-purple-800' },
+const METODO_COLORS: Record<MetodoPago, { border: string; bg: string; text: string; badge: string }> = {
+  transferencia: { border: 'border-l-blue-500', bg: 'bg-blue-100', text: 'text-blue-800', badge: 'badge-info' },
+  efectivo: { border: 'border-l-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800', badge: 'badge-success' },
+  cheque: { border: 'border-l-amber-500', bg: 'bg-amber-100', text: 'text-amber-800', badge: 'badge-warning' },
+  otro: { border: 'border-l-purple-500', bg: 'bg-purple-100', text: 'text-purple-800', badge: 'badge-danger' },
 };
 
 interface IngresoForm {
@@ -440,8 +440,8 @@ export default function IngresosPage() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`animate-slide-in rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all ${
-              toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            className={`animate-slide-in-right rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg transition-all ${
+              toast.type === 'success' ? 'badge-success' : 'badge-danger'
             }`}
           >
             {toast.message}
@@ -450,24 +450,29 @@ export default function IngresosPage() {
       </div>
 
       {/* Page Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ingresos</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Administra los ingresos del proyecto
-          </p>
+      <div className="mb-6 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#16a34a] to-[#22c55e] shadow-md">
+            <TrendingUp className="text-white" size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Ingresos</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Administra los ingresos del proyecto
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#16a34a] px-4 py-2.5 text-sm font-medium text-[#16a34a] transition-colors hover:bg-[#16a34a]/5"
+            className="btn-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Download size={16} />
             Exportar Reporte Excel
           </button>
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#16a34a] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#15803d]"
+            className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Plus size={16} />
             Registrar Ingreso
@@ -476,7 +481,7 @@ export default function IngresosPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="mb-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="card-modern mb-6 animate-fade-in bg-white p-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">
@@ -526,10 +531,11 @@ export default function IngresosPage() {
 
       {/* Summary Cards */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {summaryCards.map((card) => (
+        {summaryCards.map((card, idx) => (
           <div
             key={card.met}
-            className={`rounded-xl border-l-4 ${METODO_COLORS[card.met].border} bg-white p-4 shadow-sm ring-1 ring-gray-100`}
+            className={`card-modern animate-slide-in-up rounded-xl border-l-4 ${METODO_COLORS[card.met].border} bg-white p-4`}
+            style={{ animationDelay: `${idx * 0.05}s`, opacity: 0 }}
           >
             <div className="flex items-center justify-between">
               <div>
@@ -550,7 +556,10 @@ export default function IngresosPage() {
         ))}
 
         {/* Gran Total */}
-        <div className="rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div
+          className="card-modern animate-slide-in-up rounded-xl border-l-4 border-l-[#16a34a] bg-white p-4"
+          style={{ animationDelay: `${summaryCards.length * 0.05}s`, opacity: 0 }}
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Gran Total</p>
@@ -581,19 +590,23 @@ export default function IngresosPage() {
             ))}
           </div>
         ) : ingresos.length === 0 ? (
-          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-sm text-gray-400 shadow-sm ring-1 ring-gray-100">
+          <div className="card-modern flex items-center justify-center bg-white py-12 text-sm text-gray-400">
             No se encontraron ingresos para los filtros seleccionados.
           </div>
         ) : (
-          ingresos.map((ingreso) => {
+          ingresos.map((ingreso, idx) => {
             const met = (ingreso.metodo_pago as MetodoPago) ?? 'otro';
             return (
-              <div key={ingreso.id} className={`rounded-xl border-l-4 ${METODO_COLORS[met].border} bg-white p-4 shadow-sm ring-1 ring-gray-100`}>
+              <div
+                key={ingreso.id}
+                className={`card-modern animate-slide-in-up rounded-xl border-l-4 ${METODO_COLORS[met].border} bg-white p-4`}
+                style={{ animationDelay: `${Math.min(idx, 8) * 0.04}s`, opacity: 0 }}
+              >
                 <div className="mb-2 flex items-start justify-between">
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-gray-900">{ingreso.concepto}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${METODO_COLORS[met].bg} ${METODO_COLORS[met].text}`}>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${METODO_COLORS[met].badge}`}>
                         {METODOS_PAGO[met]}
                       </span>
                       <span className="text-xs text-gray-500">{formatDate(ingreso.fecha)}</span>
@@ -629,7 +642,7 @@ export default function IngresosPage() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
+      <div className="card-modern hidden overflow-hidden bg-white md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -679,7 +692,7 @@ export default function IngresosPage() {
                       <td className="px-4 py-3 text-gray-600">{ingreso.cliente ?? '-'}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${METODO_COLORS[met].bg} ${METODO_COLORS[met].text}`}
+                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${METODO_COLORS[met].badge}`}
                         >
                           {METODOS_PAGO[met]}
                         </span>
@@ -876,14 +889,14 @@ export default function IngresosPage() {
                 setEditingIngreso(null);
                 setForm(emptyForm);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[#16a34a] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#15803d] disabled:opacity-50"
+              className="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Guardando...' : editingIngreso ? 'Actualizar' : 'Guardar'}
             </button>
@@ -919,14 +932,14 @@ export default function IngresosPage() {
                 setShowDeleteModal(false);
                 setDeletingIngreso(null);
               }}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
             >
               Cancelar
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              className="btn-danger rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </button>
