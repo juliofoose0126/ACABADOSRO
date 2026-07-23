@@ -23,9 +23,9 @@ import {
 } from 'lucide-react';
 
 const ESTADO_CONFIG: Record<Proyecto['estado'], { label: string; color: string; icon: typeof Clock }> = {
-  activo: { label: 'Activo', color: 'bg-green-100 text-green-800', icon: Clock },
-  completado: { label: 'Completado', color: 'bg-blue-100 text-blue-800', icon: CheckCircle2 },
-  pausado: { label: 'Pausado', color: 'bg-yellow-100 text-yellow-800', icon: Pause },
+  activo: { label: 'Activo', color: 'badge-success', icon: Clock },
+  completado: { label: 'Completado', color: 'badge-info', icon: CheckCircle2 },
+  pausado: { label: 'Pausado', color: 'badge-warning', icon: Pause },
 };
 
 interface FormData {
@@ -153,7 +153,7 @@ export default function ProyectosPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Top Bar */}
-      <header className="border-b border-gray-200 bg-white shadow-sm">
+      <header className="sticky top-0 z-20 border-b border-gray-200/60 bg-white/80 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="overflow-hidden rounded-lg bg-white p-1 shadow-sm ring-1 ring-gray-200">
@@ -169,12 +169,12 @@ export default function ProyectosPage() {
               <p className="text-xs text-gray-500">{getGreeting()}</p>
               <p className="text-sm font-medium text-gray-700">{userName || userEmail}</p>
             </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D4A520]/20 text-xs font-bold text-[#D4A520]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#D4A520] to-[#E8B82E] text-xs font-bold text-[#1a365d] shadow-sm">
               {(userName || userEmail).charAt(0).toUpperCase()}
             </div>
             <button
               onClick={handleLogout}
-              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className="rounded-lg p-2 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
               title="Cerrar sesión"
             >
               <LogOut size={18} />
@@ -186,9 +186,9 @@ export default function ProyectosPage() {
       {/* Content */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-8 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
               <Building2 className="text-white" size={24} />
             </div>
             <div>
@@ -227,12 +227,13 @@ export default function ProyectosPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {proyectos.map((proyecto) => {
+            {proyectos.map((proyecto, idx) => {
               const estadoCfg = ESTADO_CONFIG[proyecto.estado];
               return (
                 <div
                   key={proyecto.id}
-                  className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition-all hover:shadow-md hover:ring-gray-200"
+                  className="card-modern group relative animate-slide-in-up overflow-hidden"
+                  style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
                 >
                   <div className="absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b from-[#D4A520] via-[#E8B82E] to-[#D4A520]" />
 
@@ -248,7 +249,7 @@ export default function ProyectosPage() {
                           </div>
                         )}
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${estadoCfg.color}`}>
+                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${estadoCfg.color}`}>
                         {estadoCfg.label}
                       </span>
                     </div>
