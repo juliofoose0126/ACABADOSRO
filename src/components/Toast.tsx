@@ -25,17 +25,20 @@ export default function Toast({ message, type, onClose }: ToastProps) {
 
   return (
     <div
-      className={`animate-slide-in-right fixed right-4 top-4 z-[200] flex items-center gap-3 rounded-lg ${bg} ${border} px-5 py-4 shadow-xl ring-1 ring-gray-100`}
+      className={`animate-slide-in-right fixed right-4 top-4 z-[200] overflow-hidden rounded-lg ${bg} ${border} shadow-xl ring-1 ring-gray-100`}
     >
-      <Icon size={20} className={iconColor} />
-      <p className="text-sm font-medium text-gray-800">{message}</p>
-      <button
-        onClick={onClose}
-        className="ml-3 rounded-md p-0.5 text-gray-400 transition-colors hover:text-gray-600"
-        aria-label="Cerrar"
-      >
-        <X size={16} />
-      </button>
+      <div className="flex items-center gap-3 px-5 py-4">
+        <Icon size={20} className={iconColor} />
+        <p className="text-sm font-medium text-gray-800">{message}</p>
+        <button
+          onClick={onClose}
+          className="ml-3 rounded-md p-0.5 text-gray-400 transition-colors hover:text-gray-600"
+          aria-label="Cerrar"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      <div className={`toast-progress h-0.5 ${iconColor.replace('text-', 'bg-')}`} />
     </div>
   );
 }

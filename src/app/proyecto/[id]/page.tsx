@@ -21,6 +21,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { MESES, CATEGORIAS_GASTO, TipoGasto } from '@/lib/types';
 import { exportMultiSheetExcel, formatCurrency as fmtCur } from '@/lib/export-utils';
+import CountUp from '@/components/CountUp';
 
 const RechartsBar = dynamic(
   () => import('recharts').then((m) => m.BarChart),
@@ -414,7 +415,7 @@ export default function ProjectDashboardPage() {
     <div className="pt-10 md:pt-0">
       {/* Welcome Header */}
       <div className="mb-8 animate-fade-in">
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#1a365d] to-[#2a4a7f] p-6 shadow-lg md:p-8">
+        <div className="gradient-animated overflow-hidden rounded-2xl bg-gradient-to-r from-[#1a365d] via-[#2a4a7f] to-[#1a365d] p-6 shadow-lg md:p-8">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-[#D4A520]">{getGreeting()}</p>
@@ -423,7 +424,7 @@ export default function ProjectDashboardPage() {
               </h1>
               <p className="mt-2 text-sm text-white/60">Panel de control — Acabados RO</p>
             </div>
-            <div className="hidden md:block">
+            <div className="animate-float hidden md:block">
               <TrendingUp size={48} className="text-white/20" />
             </div>
           </div>
@@ -447,7 +448,11 @@ export default function ProjectDashboardPage() {
                 <div>
                   <p className="text-xs font-medium tracking-wide text-gray-500 uppercase">{card.label}</p>
                   <p className="mt-2 text-2xl font-bold text-[#1a365d]">
-                    {loading ? <span className="inline-block h-8 w-20 animate-pulse rounded bg-gray-200" /> : formatValue(card.value, card.format)}
+                    {loading ? (
+                      <span className="inline-block h-8 w-20 animate-pulse rounded bg-gray-200" />
+                    ) : (
+                      <CountUp value={card.value} format={(n) => formatValue(n, card.format)} />
+                    )}
                   </p>
                 </div>
                 <div className={`rounded-xl bg-gradient-to-br ${card.color} p-2.5 shadow-sm`}>
@@ -468,7 +473,7 @@ export default function ProjectDashboardPage() {
         <div className="mb-8 animate-fade-in">
           <button
             onClick={() => router.push(`${base}/inventario`)}
-            className="card-hover flex w-full items-center gap-4 rounded-xl border border-[#D4A520]/20 bg-[#D4A520]/5 p-4 text-left transition-colors hover:border-[#D4A520]/40"
+            className="animate-pulse-soft card-hover flex w-full items-center gap-4 rounded-xl border border-[#D4A520]/20 bg-[#D4A520]/5 p-4 text-left transition-colors hover:border-[#D4A520]/40"
           >
             <div className="rounded-lg bg-[#D4A520]/10 p-2.5">
               <AlertTriangle size={22} className="text-[#D4A520]" />
@@ -518,19 +523,19 @@ export default function ProjectDashboardPage() {
           <div className="rounded-xl border-l-4 border-l-[#16a34a] card-modern bg-white p-5">
             <p className="text-xs font-medium text-gray-500">Ingresos {reportYear}</p>
             <p className="mt-1 text-2xl font-bold text-[#16a34a]">
-              {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : fmtMoney(totalIngresosYear)}
+              {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : <CountUp value={totalIngresosYear} format={fmtMoney} />}
             </p>
           </div>
           <div className="rounded-xl border-l-4 border-l-[#8B1A1A] card-modern bg-white p-5">
             <p className="text-xs font-medium text-gray-500">Gastos {reportYear}</p>
             <p className="mt-1 text-2xl font-bold text-[#8B1A1A]">
-              {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : fmtMoney(totalGastosYear)}
+              {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : <CountUp value={totalGastosYear} format={fmtMoney} />}
             </p>
           </div>
           <div className={`rounded-xl border-l-4 ${balanceYear >= 0 ? 'border-l-[#16a34a]' : 'border-l-[#dc2626]'} card-modern bg-white p-5`}>
             <p className="text-xs font-medium text-gray-500">Balance {reportYear}</p>
             <p className={`mt-1 text-2xl font-bold ${balanceYear >= 0 ? 'text-[#16a34a]' : 'text-[#dc2626]'}`}>
-              {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : fmtMoney(balanceYear)}
+              {loadingReport ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-gray-200" /> : <CountUp value={balanceYear} format={fmtMoney} />}
             </p>
             {!loadingReport && (
               <p className={`mt-0.5 text-xs font-medium ${balanceYear >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -541,7 +546,7 @@ export default function ProjectDashboardPage() {
           <div className="rounded-xl border-l-4 border-l-[#D4A520] card-modern bg-white p-5">
             <p className="text-xs font-medium text-gray-500">Margen</p>
             <p className="mt-1 text-2xl font-bold text-[#D4A520]">
-              {loadingReport ? <span className="inline-block h-7 w-16 animate-pulse rounded bg-gray-200" /> : `${margenPct.toFixed(1)}%`}
+              {loadingReport ? <span className="inline-block h-7 w-16 animate-pulse rounded bg-gray-200" /> : <CountUp value={margenPct} format={(n) => `${n.toFixed(1)}%`} />}
             </p>
             {!loadingReport && (
               <p className="mt-0.5 text-xs text-gray-400">Inventario: {fmtMoney(totalInventarioValor)}</p>

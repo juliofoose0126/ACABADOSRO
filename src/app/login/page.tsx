@@ -77,10 +77,17 @@ export default function LoginPage() {
 
       <div className="absolute inset-0 bg-gradient-to-br from-[#0f2440] via-[#1a365d]/90 to-[#0f2440]" />
 
+      {/* Floating glow blobs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="animate-blob absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#D4A520]/20 blur-3xl" />
+        <div className="animate-blob absolute -bottom-32 -right-16 h-80 w-80 rounded-full bg-[#2a4a7f]/30 blur-3xl" style={{ animationDelay: '3s' }} />
+        <div className="animate-blob absolute left-1/2 top-1/3 h-56 w-56 -translate-x-1/2 rounded-full bg-[#8B1A1A]/10 blur-3xl" style={{ animationDelay: '6s' }} />
+      </div>
+
       <div className="relative z-10 w-full max-w-md animate-fade-in">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center">
-          <div className="mb-4 overflow-hidden rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="animate-pop-in animate-float mb-4 overflow-hidden rounded-2xl bg-white p-5 shadow-2xl">
             <Image
               src="/logo.jpg"
               alt="Acabados RO"
@@ -97,7 +104,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-md">
+        <div className="animate-scale-in rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-md">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="animate-fade-in stagger-1" style={{ opacity: 0 }}>
               <label
