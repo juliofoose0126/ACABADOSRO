@@ -384,7 +384,7 @@ export default function InventarioPage() {
 
         <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
           <button type="button" onClick={resetAndCloseModals}
-            className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            className="btn-secondary rounded-lg px-4 py-2.5 text-sm font-medium">
             Cancelar
           </button>
           <button type="submit" disabled={saving}
@@ -401,7 +401,7 @@ export default function InventarioPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Header */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 animate-fade-in">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#1a365d] to-[#2a4a7f]">
             <Package className="h-5 w-5 text-white" />
@@ -422,7 +422,7 @@ export default function InventarioPage() {
             <FileUp className="h-4 w-4" /> Registrar Factura
           </button>
           <button onClick={() => setIsFacturasListOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:flex-none">
+            className="btn-secondary flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium sm:flex-none">
             <Eye className="h-4 w-4" /> Facturas
           </button>
         </div>
@@ -450,7 +450,7 @@ export default function InventarioPage() {
       {loading ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <div key={i} className="card-modern animate-pulse bg-white p-4">
               <div className="mb-3 h-4 w-3/4 rounded bg-gray-200" />
               <div className="space-y-2">
                 <div className="h-3 w-1/2 rounded bg-gray-200" />
@@ -460,7 +460,7 @@ export default function InventarioPage() {
           ))}
         </div>
       ) : filteredMaterials.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
+        <div className="card-modern flex flex-col items-center justify-center bg-white py-16">
           <Package size={48} className="mb-3 text-gray-300" />
           <p className="text-sm text-gray-500">{searchTerm ? 'Sin resultados' : 'No hay materiales'}</p>
         </div>
@@ -468,11 +468,12 @@ export default function InventarioPage() {
         <>
           {/* Mobile card view */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:hidden">
-            {filteredMaterials.map((m) => {
+            {filteredMaterials.map((m, idx) => {
               const isLow = m.cantidad <= m.stock_minimo && m.stock_minimo > 0;
               return (
                 <div key={m.id}
-                  className={`card-hover rounded-xl bg-white p-4 shadow-sm ring-1 ${isLow ? 'ring-amber-200 bg-amber-50/50' : 'ring-gray-100'}`}>
+                  className={`card-modern animate-slide-in-up p-4 ${isLow ? 'bg-amber-50/50' : 'bg-white'}`}
+                  style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}>
                   <div className="mb-2 flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-[#1a365d]">{m.nombre}</p>
@@ -502,7 +503,7 @@ export default function InventarioPage() {
                       </span>
                       <span className="text-xs text-gray-400">{m.unidad}</span>
                     </div>
-                    {isLow && <span className="text-xs font-medium text-amber-600">Stock bajo</span>}
+                    {isLow && <span className="badge-warning rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm">Stock bajo</span>}
                   </div>
                 </div>
               );
@@ -510,7 +511,7 @@ export default function InventarioPage() {
           </div>
 
           {/* Desktop table view */}
-          <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm md:block">
+          <div className="card-modern hidden overflow-x-auto bg-white md:block">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -525,7 +526,7 @@ export default function InventarioPage() {
                 {filteredMaterials.map((m) => {
                   const isLow = m.cantidad <= m.stock_minimo && m.stock_minimo > 0;
                   return (
-                    <tr key={m.id} className={isLow ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}>
+                    <tr key={m.id} className={`transition-colors ${isLow ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}`}>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-gray-600">{m.codigo ?? '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
                         <div className="flex items-center gap-1.5">
@@ -566,7 +567,7 @@ export default function InventarioPage() {
             ¿Eliminar <span className="font-semibold text-gray-900">{deletingMaterial?.nombre}</span>? Esta acción no se puede deshacer.
           </p>
           <div className="flex justify-end gap-3">
-            <button onClick={resetAndCloseModals} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button onClick={resetAndCloseModals} className="btn-secondary rounded-lg px-4 py-2.5 text-sm font-medium">Cancelar</button>
             <button onClick={handleDelete} disabled={saving} className="btn-danger rounded-lg px-5 py-2.5 text-sm font-medium disabled:opacity-50">
               {saving ? 'Eliminando...' : 'Eliminar'}
             </button>
@@ -679,7 +680,7 @@ export default function InventarioPage() {
 
           <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
             <button onClick={() => setIsFacturaModalOpen(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              className="btn-secondary rounded-lg px-4 py-2.5 text-sm font-medium">
               Cancelar
             </button>
             <button onClick={handleSaveFactura} disabled={saving}
