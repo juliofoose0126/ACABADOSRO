@@ -8,13 +8,13 @@ import { Gasto, TipoGasto, MESES, CATEGORIAS_GASTO } from '@/lib/types';
 import { exportMultiSheetExcel, formatCurrency, formatDate } from '@/lib/export-utils';
 import Modal from '@/components/Modal';
 
-const CATEGORIA_COLORS: Record<TipoGasto, { border: string; bg: string; text: string }> = {
-  nomina: { border: 'border-l-blue-500', bg: 'bg-blue-100', text: 'text-blue-800' },
-  seguros: { border: 'border-l-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800' },
-  materiales: { border: 'border-l-amber-500', bg: 'bg-amber-100', text: 'text-amber-800' },
-  palazuelos: { border: 'border-l-rose-500', bg: 'bg-rose-100', text: 'text-rose-800' },
-  empleados: { border: 'border-l-cyan-500', bg: 'bg-cyan-100', text: 'text-cyan-800' },
-  otros: { border: 'border-l-purple-500', bg: 'bg-purple-100', text: 'text-purple-800' },
+const CATEGORIA_COLORS: Record<TipoGasto, { border: string; bg: string; text: string; badge: string }> = {
+  nomina: { border: 'border-l-blue-500', bg: 'bg-blue-100', text: 'text-blue-800', badge: 'badge-info' },
+  seguros: { border: 'border-l-emerald-500', bg: 'bg-emerald-100', text: 'text-emerald-800', badge: 'badge-success' },
+  materiales: { border: 'border-l-amber-500', bg: 'bg-amber-100', text: 'text-amber-800', badge: 'badge-warning' },
+  palazuelos: { border: 'border-l-rose-500', bg: 'bg-rose-100', text: 'text-rose-800', badge: 'badge-danger' },
+  empleados: { border: 'border-l-cyan-500', bg: 'bg-cyan-100', text: 'text-cyan-800', badge: 'badge-info' },
+  otros: { border: 'border-l-purple-500', bg: 'bg-purple-100', text: 'text-purple-800', badge: 'badge-warning' },
 };
 
 interface GastoForm {
@@ -475,24 +475,29 @@ export default function GastosPage() {
       </div>
 
       {/* Page Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gastos</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Administra los gastos de Acabados RO
-          </p>
+      <div className="mb-6 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#8B1A1A] to-[#A52222] shadow-md">
+            <DollarSign className="text-white" size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Gastos</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Administra los gastos de Acabados RO
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#1a365d] px-4 py-2.5 text-sm font-medium text-[#1a365d] transition-colors hover:bg-[#1a365d]/5"
+            className="btn-secondary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Download size={16} />
             Exportar Reporte Excel
           </button>
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+            className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <Plus size={16} />
             Registrar Gasto
@@ -501,7 +506,7 @@ export default function GastosPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="mb-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <div className="card-modern mb-6 bg-white p-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-500">
@@ -561,10 +566,11 @@ export default function GastosPage() {
 
       {/* Summary Cards */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        {summaryCards.map((card) => (
+        {summaryCards.map((card, idx) => (
           <div
             key={card.cat}
-            className={`rounded-xl border-l-4 ${CATEGORIA_COLORS[card.cat].border} bg-white p-4 shadow-sm ring-1 ring-gray-100`}
+            className={`card-modern animate-slide-in-up border-l-4 ${CATEGORIA_COLORS[card.cat].border} bg-white p-4`}
+            style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
           >
             <div className="flex items-center justify-between">
               <div>
@@ -585,7 +591,10 @@ export default function GastosPage() {
         ))}
 
         {/* Gran Total */}
-        <div className="rounded-xl border-l-4 border-l-[#1a365d] bg-white p-4 shadow-sm ring-1 ring-gray-100">
+        <div
+          className="card-modern animate-slide-in-up border-l-4 border-l-[#1a365d] bg-white p-4"
+          style={{ animationDelay: `${Math.min(summaryCards.length, 8) * 0.05}s`, opacity: 0 }}
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Gran Total</p>
@@ -609,24 +618,24 @@ export default function GastosPage() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+              <div key={i} className="card-modern animate-pulse bg-white p-4">
                 <div className="mb-2 h-4 w-3/4 rounded bg-gray-200" />
                 <div className="h-4 w-1/2 rounded bg-gray-200" />
               </div>
             ))}
           </div>
         ) : gastos.length === 0 ? (
-          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-sm text-gray-400 shadow-sm ring-1 ring-gray-100">
+          <div className="card-modern flex items-center justify-center bg-white py-12 text-sm text-gray-400">
             No se encontraron gastos para los filtros seleccionados.
           </div>
         ) : (
           gastos.map((gasto) => (
-            <div key={gasto.id} className={`rounded-xl border-l-4 ${CATEGORIA_COLORS[gasto.categoria].border} bg-white p-4 shadow-sm ring-1 ring-gray-100`}>
+            <div key={gasto.id} className={`card-modern border-l-4 ${CATEGORIA_COLORS[gasto.categoria].border} bg-white p-4`}>
               <div className="mb-2 flex items-start justify-between">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{gasto.concepto}</p>
                   <div className="mt-1 flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORIA_COLORS[gasto.categoria].bg} ${CATEGORIA_COLORS[gasto.categoria].text}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${CATEGORIA_COLORS[gasto.categoria].badge}`}>
                       {CATEGORIAS_GASTO[gasto.categoria]}
                     </span>
                     <span className="text-xs text-gray-500">{formatDate(gasto.fecha)}</span>
@@ -660,7 +669,7 @@ export default function GastosPage() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-100 md:block">
+      <div className="card-modern hidden overflow-hidden bg-white md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -702,7 +711,7 @@ export default function GastosPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${CATEGORIA_COLORS[gasto.categoria].bg} ${CATEGORIA_COLORS[gasto.categoria].text}`}
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${CATEGORIA_COLORS[gasto.categoria].badge}`}
                       >
                         {CATEGORIAS_GASTO[gasto.categoria]}
                       </span>

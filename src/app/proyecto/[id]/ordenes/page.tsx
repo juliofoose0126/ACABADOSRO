@@ -43,10 +43,10 @@ interface Toast {
 type EstadoFilter = 'todos' | OrdenCompra['estado'];
 
 const ESTADO_COLORS: Record<OrdenCompra['estado'], string> = {
-  pendiente: 'bg-yellow-100 text-yellow-800',
-  aprobada: 'bg-green-100 text-green-800',
-  recibida: 'bg-blue-100 text-blue-800',
-  cancelada: 'bg-red-100 text-red-800',
+  pendiente: 'badge-warning',
+  aprobada: 'badge-info',
+  recibida: 'badge-success',
+  cancelada: 'badge-danger',
 };
 
 const ESTADO_LABELS: Record<OrdenCompra['estado'], string> = {
@@ -626,8 +626,8 @@ export default function OrdenesPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`animate-slide-in flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              t.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            className={`animate-slide-in-right flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+              t.type === 'success' ? 'badge-success' : 'badge-danger'
             }`}
           >
             {t.message}
@@ -642,9 +642,9 @@ export default function OrdenesPage() {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1a365d]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
             <ShoppingCart className="text-white" size={22} />
           </div>
           <div>
@@ -658,7 +658,7 @@ export default function OrdenesPage() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => router.push(`/proyecto/${projectId}/generar-orden`)}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#D4A520] px-4 py-2.5 text-sm font-medium text-[#D4A520] transition-colors hover:bg-[#D4A520]/5"
+            className="btn-gold flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
           >
             <FileText size={18} />
             Desde Cotización
@@ -674,7 +674,7 @@ export default function OrdenesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 animate-fade-in sm:flex-row">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -702,12 +702,16 @@ export default function OrdenesPage() {
         {loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Cargando...</div>
         ) : ordenesFiltradas.length === 0 ? (
-          <div className="flex items-center justify-center rounded-xl bg-white py-12 text-gray-400 shadow-sm ring-1 ring-gray-100">
+          <div className="card-modern flex items-center justify-center bg-white py-12 text-gray-400">
             No se encontraron ordenes
           </div>
         ) : (
-          ordenesFiltradas.map((orden) => (
-            <div key={orden.id} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          ordenesFiltradas.map((orden, idx) => (
+            <div
+              key={orden.id}
+              className="card-modern animate-slide-in-up bg-white p-4"
+              style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
+            >
               <div className="mb-2 flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold text-[#1a365d]">{orden.numero_orden}</p>
@@ -716,7 +720,7 @@ export default function OrdenesPage() {
                     <p className="mt-0.5 text-xs text-gray-400">{orden.obra_proyecto}</p>
                   )}
                 </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[orden.estado]}`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${ESTADO_COLORS[orden.estado]}`}>
                   {ESTADO_LABELS[orden.estado]}
                 </span>
               </div>
@@ -747,7 +751,7 @@ export default function OrdenesPage() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm md:block">
+      <div className="card-modern hidden overflow-hidden bg-white md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -777,7 +781,7 @@ export default function OrdenesPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => openEstadoModal(orden)}
-                          className={`inline-block cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${ESTADO_COLORS[orden.estado]}`}
+                          className={`inline-block cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-opacity hover:opacity-80 ${ESTADO_COLORS[orden.estado]}`}
                         >
                           {ESTADO_LABELS[orden.estado]}
                         </button>
@@ -786,14 +790,14 @@ export default function OrdenesPage() {
                             <button
                               onClick={() => handleQuickStateChange(orden, 'aprobada')}
                               title="Marcar como Aprobada"
-                              className="rounded p-1 text-green-600 transition-colors hover:bg-green-50"
+                              className="rounded-md p-1.5 text-green-600 transition-colors hover:bg-green-50"
                             >
                               <Check size={16} />
                             </button>
                             <button
                               onClick={() => handleQuickStateChange(orden, 'recibida')}
                               title="Marcar como Recibida"
-                              className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-50"
+                              className="rounded-md p-1.5 text-blue-600 transition-colors hover:bg-blue-50"
                             >
                               <CheckCircle2 size={16} />
                             </button>
@@ -803,7 +807,7 @@ export default function OrdenesPage() {
                           <button
                             onClick={() => handleQuickStateChange(orden, 'recibida')}
                             title="Marcar como Recibida"
-                            className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-50"
+                            className="rounded-md p-1.5 text-blue-600 transition-colors hover:bg-blue-50"
                           >
                             <CheckCircle2 size={16} />
                           </button>
@@ -1071,7 +1075,7 @@ export default function OrdenesPage() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="btn-secondary rounded-lg px-4 py-2.5 text-sm font-medium"
             >
               Cancelar
             </button>
@@ -1131,7 +1135,7 @@ export default function OrdenesPage() {
                 )}
                 <p>
                   <span className="font-semibold text-gray-700">Estado: </span>
-                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTADO_COLORS[detailOrden.estado]}`}>
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-sm ${ESTADO_COLORS[detailOrden.estado]}`}>
                     {ESTADO_LABELS[detailOrden.estado]}
                   </span>
                 </p>
@@ -1265,7 +1269,7 @@ export default function OrdenesPage() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 onClick={() => setShowEstadoModal(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="btn-secondary rounded-lg px-4 py-2 text-sm font-medium"
               >
                 Cancelar
               </button>

@@ -310,10 +310,10 @@ export default function ProveedoresPage() {
       )}
 
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 animate-fade-in sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-[#1a365d]/10 p-2.5">
-            <Truck size={24} className="text-[#1a365d]" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
+            <Truck className="text-white" size={24} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Proveedores</h1>
@@ -324,7 +324,7 @@ export default function ProveedoresPage() {
         </div>
         <button
           onClick={openAddModal}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+          className="btn-primary flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium"
         >
           <Plus size={18} />
           Agregar Proveedor
@@ -332,7 +332,7 @@ export default function ProveedoresPage() {
       </div>
 
       {/* Search */}
-      <div className="relative mb-6">
+      <div className="relative mb-6 animate-fade-in">
         <Search
           size={18}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -342,7 +342,7 @@ export default function ProveedoresPage() {
           placeholder="Buscar proveedor por nombre..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
+          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-colors focus:border-[#1a365d] focus:outline-none focus:ring-1 focus:ring-[#1a365d]"
         />
       </div>
 
@@ -352,7 +352,7 @@ export default function ProveedoresPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="animate-pulse rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100"
+              className="animate-pulse rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100"
             >
               <div className="mb-4 h-5 w-3/4 rounded bg-gray-200" />
               <div className="space-y-3">
@@ -364,7 +364,7 @@ export default function ProveedoresPage() {
           ))}
         </div>
       ) : filteredProveedores.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
+        <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 shadow-sm ring-1 ring-gray-100">
           <Truck size={48} className="mb-3 text-gray-300" />
           <p className="text-sm text-gray-500">
             {search
@@ -374,7 +374,7 @@ export default function ProveedoresPage() {
           {!search && (
             <button
               onClick={openAddModal}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f]"
+              className="btn-primary mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
             >
               <Plus size={16} />
               Agregar primer proveedor
@@ -383,10 +383,11 @@ export default function ProveedoresPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProveedores.map((proveedor) => (
+          {filteredProveedores.map((proveedor, idx) => (
             <div
               key={proveedor.id}
-              className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md"
+              className="card-modern group relative animate-slide-in-up p-5"
+              style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
             >
               <div className="mb-4 flex items-start justify-between">
                 <h3 className="text-base font-bold text-[#1a365d]">
@@ -395,14 +396,14 @@ export default function ProveedoresPage() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => openEditModal(proveedor)}
-                    className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-[#1a365d]/10 hover:text-[#1a365d]"
+                    className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-[#1a365d]"
                     title="Editar"
                   >
                     <Edit2 size={16} />
                   </button>
                   <button
                     onClick={() => openDeleteModal(proveedor)}
-                    className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
                     title="Eliminar"
                   >
                     <Trash2 size={16} />
@@ -477,7 +478,7 @@ export default function ProveedoresPage() {
         <div className="space-y-4">
           {/* OCR Upload Area */}
           {!editingProveedor && (
-            <div className="rounded-lg border-2 border-dashed border-[#1a365d]/20 bg-[#1a365d]/3 p-4 transition-colors hover:border-[#1a365d]/40">
+            <div className="rounded-xl border-2 border-dashed border-[#1a365d]/20 bg-[#1a365d]/3 p-4 transition-colors hover:border-[#1a365d]/40">
               <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
                 <div className="rounded-lg bg-[#1a365d]/10 p-3">
                   <Camera size={24} className="text-[#1a365d]" />
@@ -493,7 +494,7 @@ export default function ProveedoresPage() {
                 <button
                   onClick={() => ocrInputRef.current?.click()}
                   disabled={ocrProcessing}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+                  className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   {ocrProcessing ? (
                     <>
@@ -620,7 +621,7 @@ export default function ProveedoresPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2a4a7f] disabled:opacity-50"
+              className="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -659,7 +660,7 @@ export default function ProveedoresPage() {
             <button
               onClick={handleDelete}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              className="btn-danger inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? 'Eliminando...' : 'Eliminar'}
             </button>

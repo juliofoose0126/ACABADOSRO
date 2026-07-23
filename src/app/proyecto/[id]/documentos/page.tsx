@@ -164,8 +164,8 @@ export default function DocumentosROPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              t.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            className={`flex animate-slide-in-right items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
+              t.type === 'success' ? 'bg-gradient-to-r from-green-600 to-green-500' : 'bg-gradient-to-r from-red-600 to-red-500'
             }`}
           >
             {t.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
@@ -178,30 +178,35 @@ export default function DocumentosROPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 animate-fade-in">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-[#1a365d] sm:text-2xl">Documentos RO</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Documentos mensuales de la empresa
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
+              <FolderOpen className="text-white" size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-[#1a365d] sm:text-2xl">Documentos RO</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Documentos mensuales de la empresa
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Year selector */}
-      <div className="mb-6 flex items-center justify-center gap-4">
+      <div className="mb-6 flex animate-fade-in items-center justify-center gap-4">
         <button
           onClick={() => setAnio((y) => y - 1)}
-          className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-100"
+          className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#1a365d]/30 hover:text-[#1a365d] hover:shadow-md"
         >
           <ChevronLeft size={20} />
         </button>
-        <span className="min-w-[80px] text-center text-lg font-bold text-[#1a365d]">{anio}</span>
+        <span className="min-w-[80px] rounded-lg bg-white px-4 py-1.5 text-center text-lg font-bold text-[#1a365d] shadow-sm ring-1 ring-gray-100">{anio}</span>
         <button
           onClick={() => setAnio((y) => y + 1)}
           disabled={anio >= currentYear}
-          className="rounded-lg border border-gray-200 p-2 text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
+          className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#1a365d]/30 hover:text-[#1a365d] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
         >
           <ChevronRight size={20} />
         </button>
@@ -228,7 +233,8 @@ export default function DocumentosROPage() {
               <button
                 key={mes}
                 onClick={() => setSelectedMonth(mes)}
-                className={`group relative flex flex-col items-center rounded-xl border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 ${
+                style={{ animationDelay: `${Math.min(idx, 8) * 0.05}s`, opacity: 0 }}
+                className={`group relative flex animate-scale-in flex-col items-center rounded-xl border-2 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg ${
                   isCurrent
                     ? 'border-[#D4A520] bg-[#D4A520]/5 shadow-md'
                     : hasAll
@@ -239,7 +245,7 @@ export default function DocumentosROPage() {
                 }`}
               >
                 {isCurrent && (
-                  <span className="absolute -top-2 right-2 rounded-full bg-[#D4A520] px-2 py-0.5 text-[10px] font-bold text-white">
+                  <span className="absolute -top-2 right-2 rounded-full bg-gradient-to-r from-[#D4A520] to-[#E8B82E] px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                     ACTUAL
                   </span>
                 )}
@@ -279,7 +285,7 @@ export default function DocumentosROPage() {
       )}
 
       {/* Legend */}
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-500">
+      <div className="mt-6 flex animate-fade-in flex-wrap items-center justify-center gap-4 rounded-xl bg-white/70 px-4 py-3 text-xs text-gray-500 shadow-sm ring-1 ring-gray-100">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-full border-2 border-green-300 bg-green-50" />
           Completo

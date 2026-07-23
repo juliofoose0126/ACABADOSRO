@@ -313,8 +313,8 @@ export default function GenerarOrdenPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              t.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            className={`animate-slide-in-up flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
+              t.type === 'success' ? 'badge-success' : 'badge-danger'
             }`}
           >
             {t.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
@@ -327,13 +327,16 @@ export default function GenerarOrdenPage() {
       </div>
 
       {/* Header */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex animate-fade-in items-center gap-4">
         <button
           onClick={() => router.back()}
           className="rounded-lg p-2 transition-colors hover:bg-gray-100"
         >
           <ArrowLeft size={20} className="text-gray-600" />
         </button>
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a365d] to-[#2a4a7f] shadow-md">
+          <FileText className="text-white" size={24} />
+        </div>
         <div>
           <h1 className="text-2xl font-bold text-[#1a365d]">Generar Orden de Compra</h1>
           <p className="mt-1 text-sm text-gray-500">Sube una cotización para extraer items automáticamente</p>
@@ -341,7 +344,7 @@ export default function GenerarOrdenPage() {
       </div>
 
       {/* Upload Section */}
-      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+      <div className="card-modern mb-6 animate-slide-in-up p-6" style={{ opacity: 0 }}>
         <input
           ref={ocrInputRef}
           type="file"
@@ -353,7 +356,7 @@ export default function GenerarOrdenPage() {
           type="button"
           onClick={() => ocrInputRef.current?.click()}
           disabled={processing}
-          className="flex w-full flex-col items-center gap-3 rounded-lg border-2 border-dashed border-[#D4A520]/40 bg-[#D4A520]/5 p-8"
+          className="group flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed border-[#D4A520]/40 bg-[#D4A520]/5 p-8 transition-colors hover:border-[#D4A520] hover:bg-[#D4A520]/10 disabled:cursor-not-allowed"
         >
           {processing ? (
             <>
@@ -366,7 +369,7 @@ export default function GenerarOrdenPage() {
           ) : (
             <>
               <div className="flex items-center gap-3">
-                <Camera size={24} className="text-[#D4A520]" />
+                <Camera size={24} className="text-[#D4A520] transition-transform group-hover:scale-110" />
                 <FileText size={22} className="text-[#D4A520]/80" />
                 <Upload size={20} className="text-[#D4A520]/60" />
               </div>
@@ -380,7 +383,7 @@ export default function GenerarOrdenPage() {
       </div>
 
       {/* Form */}
-      <div className="mb-6 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-100">
+      <div className="card-modern mb-6 animate-slide-in-up stagger-1 p-6" style={{ opacity: 0 }}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -438,7 +441,7 @@ export default function GenerarOrdenPage() {
       </div>
 
       {/* Items Table */}
-      <div className="mb-6 rounded-xl bg-white shadow-sm ring-1 ring-gray-100">
+      <div className="card-modern mb-6 animate-slide-in-up stagger-2" style={{ opacity: 0 }}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -454,19 +457,24 @@ export default function GenerarOrdenPage() {
             <tbody>
               {form.items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                    <FileText size={28} className="mx-auto mb-2 text-gray-300" />
                     Sube una cotización o agrega items manualmente
                   </td>
                 </tr>
               ) : (
-                form.items.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                form.items.map((item, idx) => (
+                  <tr
+                    key={item.id}
+                    className="animate-fade-in border-b border-gray-100 transition-colors hover:bg-gray-50"
+                    style={{ animationDelay: `${Math.min(idx, 10) * 0.04}s`, opacity: 0 }}
+                  >
                     <td className="px-3 py-3">
                       <input
                         type="text"
                         value={item.descripcion}
                         onChange={(e) => handleItemChange(item.id, 'descripcion', e.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-[#1a365d] focus:outline-none"
+                        className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-[#1a365d] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-3">
@@ -476,14 +484,14 @@ export default function GenerarOrdenPage() {
                         onChange={(e) => handleItemChange(item.id, 'cantidad', e.target.value)}
                         min="0"
                         step="0.01"
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-right text-sm focus:border-[#1a365d] focus:outline-none"
+                        className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm focus:border-[#1a365d] focus:outline-none"
                       />
                     </td>
                     <td className="px-3 py-3">
                       <select
                         value={item.unidad}
                         onChange={(e) => handleItemChange(item.id, 'unidad', e.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-[#1a365d] focus:outline-none"
+                        className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-[#1a365d] focus:outline-none"
                       >
                         <option value="pza">Pza</option>
                         <option value="kg">Kg</option>
@@ -504,7 +512,7 @@ export default function GenerarOrdenPage() {
                           onChange={(e) => handleItemChange(item.id, 'precio_unitario', e.target.value)}
                           min="0"
                           step="0.01"
-                          className="w-full rounded border border-gray-300 py-1 pl-6 pr-2 text-right text-sm focus:border-[#1a365d] focus:outline-none"
+                          className="w-full rounded-lg border border-gray-300 py-1 pl-6 pr-2 text-right text-sm focus:border-[#1a365d] focus:outline-none"
                         />
                       </div>
                     </td>
@@ -514,7 +522,7 @@ export default function GenerarOrdenPage() {
                     <td className="px-3 py-3 text-center">
                       <button
                         onClick={() => handleDeleteItem(item.id)}
-                        className="rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                        className="btn-danger rounded-lg p-1.5"
                       >
                         <Trash2 size={16} />
                       </button>
